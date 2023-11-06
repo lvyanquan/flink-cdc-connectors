@@ -4,26 +4,8 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestValuesDataSink implements Sink<Event> {
-
-    Map<TableID, InMemoryTable> tables = new ConcurrentHashMap<>();
-
-    static class InMemoryTable {
-        private final AtomicInteger fieldId = new AtomicInteger(-1);
-        Map<String, Map<Column, String>> data = new ConcurrentHashMap<>();
-
-
-
-        static class Column {
-            int id;
-            String type;
-        }
-    }
-
 
     @Override
     public SinkWriter<Event> createWriter(InitContext initContext) throws IOException {
@@ -39,6 +21,19 @@ public class TestValuesDataSink implements Sink<Event> {
 
         @Override
         public void write(Event event, Context context) throws IOException, InterruptedException {
+            DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+            switch (dataChangeEvent.op()) {
+                case DELETE:{
+                    ValuesDatabase.delete(dataChangeEvent.tableId(), dataChangeEvent.before().toString());
+                }
+                case INSERT:{
+                    ValuesDatabase.insert(dataChangeEvent.tableId(), dataChangeEvent.after().toString(), null);
+                }
+                case UPDATE:{
+                    ValuesDatabase.delete(dataChangeEvent.tableId(), dataChangeEvent.before().toString());
+                    ValuesDatabase.insert(dataChangeEvent.tableId(), dataChangeEvent.after().toString(), null);
+                }
+            }
 
         }
 
@@ -52,4 +47,6 @@ public class TestValuesDataSink implements Sink<Event> {
 
         }
     }
+
+
 }

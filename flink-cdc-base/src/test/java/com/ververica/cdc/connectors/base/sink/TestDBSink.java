@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.base.sink;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+
 import org.h2.tools.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +28,7 @@ import java.sql.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * test DataSink
- */
+/** test DataSink */
 public class TestDBSink implements Sink<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestDBSink.class);
@@ -38,11 +37,13 @@ public class TestDBSink implements Sink<Event> {
 
     public static void setUp() throws IOException {
         try {
-            server = Server.createTcpServer( new String[] { "-tcp", "-tcpAllowOthers", "-tcpPort", "9092" }).start();
+            server =
+                    Server.createTcpServer(
+                                    new String[] {"-tcp", "-tcpAllowOthers", "-tcpPort", "9092"})
+                            .start();
         } catch (SQLException e) {
             throw new IOException(e);
         }
-
     }
 
     public static void close() {
@@ -94,7 +95,6 @@ public class TestDBSink implements Sink<Event> {
                 }
                 throw new IOException(e);
             }
-
         }
 
         @Override
@@ -113,13 +113,16 @@ public class TestDBSink implements Sink<Event> {
 
         @Override
         public void close() throws Exception {
-            statementMap.values().forEach((statement) -> {
-                try {
-                    statement.close();
-                } catch (SQLException e) {
-                    LOG.error("", e);
-                }
-            });
+            statementMap
+                    .values()
+                    .forEach(
+                            (statement) -> {
+                                try {
+                                    statement.close();
+                                } catch (SQLException e) {
+                                    LOG.error("", e);
+                                }
+                            });
 
             if (conn != null) {
                 conn.close();
@@ -141,7 +144,5 @@ public class TestDBSink implements Sink<Event> {
                 throw new IOException(e);
             }
         }
-
     }
-
 }

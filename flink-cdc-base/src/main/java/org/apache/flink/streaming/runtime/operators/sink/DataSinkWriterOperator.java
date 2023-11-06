@@ -17,11 +17,6 @@
 
 package org.apache.flink.streaming.runtime.operators.sink;
 
-import com.ververica.cdc.connectors.base.sink.Event;
-import com.ververica.cdc.connectors.base.sink.FlushEvent;
-import com.ververica.cdc.connectors.base.sink.SchemaChangeEvent;
-import com.ververica.cdc.connectors.base.sink.SupportSchemaEvolutionWriting;
-import io.debezium.pipeline.DataChangeEvent;
 import org.apache.flink.api.common.eventtime.TimestampAssigner;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.serialization.SerializationSchema.InitializationContext;
@@ -50,8 +45,13 @@ import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.streaming.api.operators.util.SimpleVersionedListState;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.util.UserCodeClassLoader;
+
+import com.ververica.cdc.connectors.base.sink.Event;
+import com.ververica.cdc.connectors.base.sink.FlushEvent;
+import com.ververica.cdc.connectors.base.sink.SchemaChangeEvent;
+import com.ververica.cdc.connectors.base.sink.SupportSchemaEvolutionWriting;
+import io.debezium.pipeline.DataChangeEvent;
 
 import javax.annotation.Nullable;
 
@@ -106,8 +106,7 @@ class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<CommittableMe
 
     private boolean endOfInput = false;
 
-    DataSinkWriterOperator(
-            Sink<Event> sink) {
+    DataSinkWriterOperator(Sink<Event> sink) {
         this.context = new Context<>();
         this.emitDownstream = sink instanceof TwoPhaseCommittingSink;
 
@@ -155,10 +154,10 @@ class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<CommittableMe
     public void processElement(StreamRecord<Event> element) throws Exception {
         if (element.getValue() instanceof FlushEvent) {
             sinkWriter.flush(false);
-        } else if(element.getValue() instanceof DataChangeEvent) {
+        } else if (element.getValue() instanceof DataChangeEvent) {
             context.element = element;
             sinkWriter.write(element.getValue(), context);
-        } else if(sinkWriter instanceof SupportSchemaEvolutionWriting) {
+        } else if (sinkWriter instanceof SupportSchemaEvolutionWriting) {
             ((SupportSchemaEvolutionWriting) sinkWriter)
                     .processSchemaChangeEvent((SchemaChangeEvent) element.getValue());
         }
@@ -321,7 +320,7 @@ class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<CommittableMe
 
         @Override
         public org.apache.flink.api.common.operators.ProcessingTimeService
-        getProcessingTimeService() {
+                getProcessingTimeService() {
             return null;
         }
 

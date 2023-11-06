@@ -20,7 +20,9 @@ import java.io.IOException;
 
 public interface SupportSchemaEvolutionWriting {
 
-    /** Update {@link org.apache.flink.api.connector.sink2.SinkWriter} for new Schema, commit current Transaction */
+    /**
+     * Update {@link org.apache.flink.api.connector.sink2.SinkWriter} for new Schema, commit current
+     * Transaction
+     */
     void processSchemaChangeEvent(SchemaChangeEvent event) throws IOException;
-
 }
