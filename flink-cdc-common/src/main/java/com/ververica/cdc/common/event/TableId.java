@@ -16,10 +16,11 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
@@ -43,7 +44,7 @@ import java.util.Objects;
  * </ul>
  */
 @PublicEvolving
-public class TableId {
+public class TableId implements Serializable {
 
     @Nullable private final String namespace;
     @Nullable private final String schemaName;

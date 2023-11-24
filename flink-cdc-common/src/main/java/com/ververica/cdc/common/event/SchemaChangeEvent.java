@@ -16,11 +16,13 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
+
+import java.io.Serializable;
 
 /**
  * Class {@code SchemaChangeEvent} represents the changes in the table structure of the external
  * system, such as CREATE, DROP, RENAME and so on.
  */
 @PublicEvolving
-public interface SchemaChangeEvent extends ChangeEvent {}
+public interface SchemaChangeEvent extends ChangeEvent, Serializable {}
