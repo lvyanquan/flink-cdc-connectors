@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.values.sink;
 
+import com.ververica.cdc.common.data.RecordData;
 import org.apache.flink.api.common.functions.util.PrintSinkOutputWriter;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.StatefulSink;
@@ -109,17 +110,24 @@ public class ValuesDataSink implements DataSink, Serializable {
          */
         private final Map<TableId, Schema> schemaMaps;
 
+        /** List of {@link RecordData.FieldGetter} to get Objects from {@link DataChangeEvent} */
+        private final Map<TableId, List<RecordData.FieldGetter>> keyGetterMaps;
+
         public ValuesSinkWriter(boolean materializedInMemory) {
             super();
             this.materializedInMemory = materializedInMemory;
             schemaMaps = new HashMap<>();
+            keyGetterMaps = new HashMap<>();
         }
 
         private void initializeState(Collection<TableSchemaState> bucketStates) {
             bucketStates.forEach(
-                    TableSchemaState ->
-                            schemaMaps.put(
-                                    TableSchemaState.getTableId(), TableSchemaState.getSchema()));
+                    TableSchemaState -> {
+                        schemaMaps.put(TableSchemaState.getTableId(), TableSchemaState.getSchema());
+                        keyGetterMaps.put(
+                                TableSchemaState.getTableId(),
+                                SchemaUtils.createFieldGetters(TableSchemaState.getSchema()));
+                    });
         }
 
         @Override
@@ -130,14 +138,18 @@ public class ValuesDataSink implements DataSink, Serializable {
                 TableId tableId = schemaChangeEvent.tableId();
                 if (event instanceof CreateTableEvent) {
                     schemaMaps.put(tableId, ((CreateTableEvent) event).getSchema());
+                    keyGetterMaps.put(
+                            tableId,
+                            SchemaUtils.createFieldGetters(((CreateTableEvent) event).getSchema()));
                 } else {
                     if (!schemaMaps.containsKey(tableId)) {
                         throw new RuntimeException("schema of " + tableId + " is not existed.");
                     }
-                    schemaMaps.put(
-                            tableId,
+                    Schema schema =
                             SchemaUtils.applySchemaChangeEvent(
-                                    schemaMaps.get(tableId), schemaChangeEvent));
+                                    schemaMaps.get(tableId), schemaChangeEvent);
+                    schemaMaps.put(tableId, schema);
+                    keyGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
                 }
             } else if (materializedInMemory && event instanceof DataChangeEvent) {
                 ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
