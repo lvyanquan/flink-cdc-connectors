@@ -159,11 +159,6 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             // assign next column editor to parse another column definition
                             columnDefinitionListener.setColumnEditor(
                                     columnEditors.get(parsingColumnIndex++));
-                        } else {
-                            // all columns parsed
-                            // reset global variables for next parsed statement
-                            columnEditors = null;
-                            parsingColumnIndex = STARTING_INDEX;
                         }
                     }
                 },
@@ -184,6 +179,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             });
                     changes.add(new AddColumnEvent(currentTable, addedColumns));
                     listeners.remove(columnDefinitionListener);
+                    columnEditors = null;
+                    parsingColumnIndex = STARTING_INDEX;
                 },
                 columnEditors);
         super.exitAlterByAddColumns(ctx);
