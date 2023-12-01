@@ -74,7 +74,7 @@ public class MySqlEventSourceITCase extends MySqlSourceTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(5000L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        env.setRestartStrategy(RestartStrategies.noRestart());
 
         customerDatabase.createAndInitialize();
 

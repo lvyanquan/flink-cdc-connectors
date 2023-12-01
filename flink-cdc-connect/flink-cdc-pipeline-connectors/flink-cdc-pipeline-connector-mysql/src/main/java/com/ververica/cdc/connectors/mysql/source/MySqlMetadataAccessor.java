@@ -42,21 +42,43 @@ public class MySqlMetadataAccessor implements MetadataAccessor {
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
     }
 
+    /**
+     * Always throw {@link UnsupportedOperationException} because MySQL does not support namespace.
+     */
     @Override
     public List<String> listNamespaces() {
         throw new UnsupportedOperationException("List namespace is not supported by MySQL.");
     }
 
+    /**
+     * List all database from MySQL.
+     *
+     * @param namespace This parameter is ignored because MySQL does not support namespace.
+     * @return The list of database
+     */
     @Override
     public List<String> listSchemas(@Nullable String namespace) {
         return MySqlSchemaUtils.listDatabases(sourceConfig);
     }
 
+    /**
+     * List tables from MySQL.
+     *
+     * @param namespace This parameter is ignored because MySQL does not support namespace.
+     * @param dbName The database to list tables from. If null, list tables from all databases.
+     * @return The list of {@link TableId}s.
+     */
     @Override
     public List<TableId> listTables(@Nullable String namespace, @Nullable String dbName) {
         return MySqlSchemaUtils.listTables(sourceConfig, dbName);
     }
 
+    /**
+     * Get the {@link Schema} of the given table.
+     *
+     * @param tableId The {@link TableId} of the given table.
+     * @return The {@link Schema} of the table.
+     */
     @Override
     public Schema getTableSchema(TableId tableId) {
         return MySqlSchemaUtils.getTableSchema(sourceConfig, partition, tableId);
