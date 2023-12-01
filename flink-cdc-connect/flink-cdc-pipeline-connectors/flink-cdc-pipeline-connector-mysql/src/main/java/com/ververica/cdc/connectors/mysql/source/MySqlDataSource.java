@@ -46,7 +46,7 @@ public class MySqlDataSource implements DataSource {
                         DebeziumChangelogMode.ALL,
                         ZoneId.of(sourceConfig.getServerTimeZone()),
                         sourceConfig.isIncludeSchemaChanges());
-        return FlinkSourceProvider.of(new MySqlSource<>(configFactory, deserializer));
+        return FlinkSourceProvider.of(new MysqlPipelineSource(configFactory, deserializer));
     }
 
     @Override

@@ -42,7 +42,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.utils.MySqlTypeUtils.fromDbzColumn;
+import static com.ververica.cdc.connectors.mysql.schema.MySqlCdcCommonTypeUtils.fromDbzColumn;
 
 /** Copied from {@link AlterTableParserListener} in Debezium 1.9.7.Final. */
 public class CustomAlterTableParserListener extends MySqlParserBaseListener {
@@ -207,14 +207,15 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     String newColumnName = parser.parseName(ctx.newColumn);
+
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(column.name(), newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
-                    } else {
-                        Map<String, DataType> typeMapping = new HashMap<>();
-                        typeMapping.put(column.name(), fromDbzColumn(column));
-                        changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
                     }
                     listeners.remove(columnDefinitionListener);
                 },

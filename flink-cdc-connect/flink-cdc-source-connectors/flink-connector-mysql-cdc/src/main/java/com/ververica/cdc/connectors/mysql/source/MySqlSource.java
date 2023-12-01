@@ -46,7 +46,6 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
-import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
@@ -163,10 +162,8 @@ public class MySqlSource<T>
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
-                new MySqlRecordEmitter<>(
-                        deserializationSchema,
-                        sourceReaderMetrics,
-                        sourceConfig.isIncludeSchemaChanges()),
+                createEmitter(
+                        sourceReaderMetrics, sourceConfig.isIncludeSchemaChanges(), sourceConfig),
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
                 sourceConfig);
