@@ -27,7 +27,6 @@ import com.ververica.cdc.common.factories.Factory;
 import com.ververica.cdc.common.schema.Selectors;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.connectors.mysql.source.MySqlDataSource;
-import com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
@@ -66,6 +65,7 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.S
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
@@ -86,42 +86,42 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     @Override
     public DataSource createDataSource(Context context) {
         final Configuration config = context.getConfiguration();
-        String hostname = config.get(MySqlDataSourceOptions.HOSTNAME);
-        int port = config.get(MySqlDataSourceOptions.PORT);
+        String hostname = config.get(HOSTNAME);
+        int port = config.get(PORT);
 
-        String username = config.get(MySqlDataSourceOptions.USERNAME);
-        String password = config.get(MySqlDataSourceOptions.PASSWORD);
-        String tables = config.get(MySqlDataSourceOptions.TABLES);
+        String username = config.get(USERNAME);
+        String password = config.get(PASSWORD);
+        String tables = config.get(TABLES);
 
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
         StartupOptions startupOptions = getStartupOptions(config);
 
-        boolean includeSchemaChanges = config.get(MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED);
+        boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
-        int fetchSize = config.get(MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE);
-        int splitSize = config.get(MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
-        int splitMetaGroupSize = config.get(MySqlDataSourceOptions.CHUNK_META_GROUP_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
 
         double distributionFactorUpper =
-                config.get(MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+                config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower =
-                config.get(MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+                config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
 
         boolean closeIdleReaders =
-                config.get(MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+                config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
 
-        Duration heartbeatInterval = config.get(MySqlDataSourceOptions.HEARTBEAT_INTERVAL);
-        Duration connectTimeout = config.get(MySqlDataSourceOptions.CONNECT_TIMEOUT);
-        int connectMaxRetries = config.get(MySqlDataSourceOptions.CONNECT_MAX_RETRIES);
-        int connectionPoolSize = config.get(MySqlDataSourceOptions.CONNECTION_POOL_SIZE);
+        Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
 
         validateIntegerOption(
-                MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
-        validateIntegerOption(MySqlDataSourceOptions.CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
-        validateIntegerOption(MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
-        validateIntegerOption(MySqlDataSourceOptions.CONNECTION_POOL_SIZE, connectionPoolSize, 1);
-        validateIntegerOption(MySqlDataSourceOptions.CONNECT_MAX_RETRIES, connectMaxRetries, 0);
+                SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+        validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
+        validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+        validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+        validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
         validateDistributionFactorUpper(distributionFactorUpper);
         validateDistributionFactorLower(distributionFactorLower);
 
@@ -192,6 +192,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(SCHEMA_CHANGE_ENABLED);
         return options;
     }
 
@@ -214,7 +215,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     }
 
     private static StartupOptions getStartupOptions(Configuration config) {
-        String modeString = config.get(MySqlDataSourceOptions.SCAN_STARTUP_MODE);
+        String modeString = config.get(SCAN_STARTUP_MODE);
 
         switch (modeString.toLowerCase()) {
             case SCAN_STARTUP_MODE_VALUE_INITIAL:
@@ -232,13 +233,13 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
                 return StartupOptions.timestamp(
-                        config.get(MySqlDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS));
+                        config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
 
             default:
                 throw new ValidationException(
                         String.format(
                                 "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s, %s], but was: %s",
-                                MySqlDataSourceOptions.SCAN_STARTUP_MODE.key(),
+                                SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 SCAN_STARTUP_MODE_VALUE_EARLIEST,
@@ -250,18 +251,18 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
     private static void validateSpecificOffset(Configuration config) {
         Optional<String> gtidSet =
-                config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
         Optional<String> binlogFilename =
-                config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         Optional<Long> binlogPosition =
-                config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         if (!gtidSet.isPresent() && !(binlogFilename.isPresent() && binlogPosition.isPresent())) {
             throw new ValidationException(
                     String.format(
                             "Unable to find a valid binlog offset. Either %s, or %s and %s are required.",
-                            MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET.key(),
-                            MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE.key(),
-                            MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS.key()));
+                            SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_FILE.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_POS.key()));
         }
     }
 
@@ -269,29 +270,29 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         BinlogOffsetBuilder offsetBuilder = BinlogOffset.builder();
 
         // GTID set
-        config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET)
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET)
                 .ifPresent(offsetBuilder::setGtidSet);
 
         // Binlog file + pos
         Optional<String> binlogFilename =
-                config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         Optional<Long> binlogPosition =
-                config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         if (binlogFilename.isPresent() && binlogPosition.isPresent()) {
             offsetBuilder.setBinlogFilePosition(binlogFilename.get(), binlogPosition.get());
         } else {
             offsetBuilder.setBinlogFilePosition("", 0);
         }
 
-        config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS)
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS)
                 .ifPresent(offsetBuilder::setSkipEvents);
-        config.getOptional(MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS)
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS)
                 .ifPresent(offsetBuilder::setSkipRows);
         return StartupOptions.specificOffset(offsetBuilder.build());
     }
 
     private String validateAndGetServerId(Configuration configuration) {
-        final String serverIdValue = configuration.get(MySqlDataSourceOptions.SERVER_ID);
+        final String serverIdValue = configuration.get(SERVER_ID);
         if (serverIdValue != null) {
             // validation
             try {
@@ -322,7 +323,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 doubleCompare(distributionFactorUpper, 1.0d) >= 0,
                 String.format(
                         "The value of option '%s' must larger than or equals %s, but is %s",
-                        MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
                         1.0d,
                         distributionFactorUpper));
     }
@@ -334,7 +335,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         && doubleCompare(distributionFactorLower, 1.0d) <= 0,
                 String.format(
                         "The value of option '%s' must between %s and %s inclusively, but is %s",
-                        MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
                         0.0d,
                         1.0d,
                         distributionFactorLower));
@@ -342,13 +343,13 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
     private static ZoneId getServerTimeZone(Configuration config) {
-        final String serverTimeZone = config.get(MySqlDataSourceOptions.SERVER_TIME_ZONE);
+        final String serverTimeZone = config.get(SERVER_TIME_ZONE);
         if (serverTimeZone != null) {
             return ZoneId.of(serverTimeZone);
         } else {
             LOG.warn(
                     "{} is not set, which might cause data inconsistencies for time-related fields.",
-                    MySqlDataSourceOptions.SERVER_TIME_ZONE.key());
+                    SERVER_TIME_ZONE.key());
             return ZoneId.systemDefault();
         }
     }
