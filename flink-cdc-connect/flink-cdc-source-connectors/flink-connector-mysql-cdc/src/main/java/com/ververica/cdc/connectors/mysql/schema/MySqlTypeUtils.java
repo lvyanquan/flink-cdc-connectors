@@ -161,10 +161,13 @@ public class MySqlTypeUtils {
             case DATE:
                 return DataTypes.DATE();
             case DATETIME:
-            case TIMESTAMP:
                 return column.length() >= 0
                         ? DataTypes.TIMESTAMP(column.length())
                         : DataTypes.TIMESTAMP();
+            case TIMESTAMP:
+                return column.length() >= 0
+                        ? DataTypes.TIMESTAMP_LTZ(column.length())
+                        : DataTypes.TIMESTAMP_LTZ();
             case CHAR:
                 return DataTypes.CHAR(column.length());
             case VARCHAR:
@@ -182,4 +185,6 @@ public class MySqlTypeUtils {
                         String.format("Don't support MySQL type '%s' yet.", typeName));
         }
     }
+
+    private MySqlTypeUtils() {}
 }
