@@ -20,6 +20,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.pipeline.PipelineConfig;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
@@ -106,12 +107,13 @@ class YamlPipelineDefinitionParserTest {
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
                     null,
-                    Configuration.fromMap(
-                            ImmutableMap.<String, String>builder()
-                                    .put("name", "source-database-sync-pipe")
-                                    .put("parallelism", "4")
-                                    .put("enable-schema-evolution", "false")
-                                    .build()));
+                    PipelineConfig.fromConfiguration(
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("name", "source-database-sync-pipe")
+                                            .put("parallelism", "4")
+                                            .put("enable-schema-evolution", "false")
+                                            .build())));
 
     private final PipelineDef fullDefWithGlobalConf =
             new PipelineDef(
@@ -150,13 +152,14 @@ class YamlPipelineDefinitionParserTest {
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
                     null,
-                    Configuration.fromMap(
-                            ImmutableMap.<String, String>builder()
-                                    .put("name", "source-database-sync-pipe")
-                                    .put("parallelism", "4")
-                                    .put("enable-schema-evolution", "false")
-                                    .put("foo", "bar")
-                                    .build()));
+                    PipelineConfig.fromConfiguration(
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("name", "source-database-sync-pipe")
+                                            .put("parallelism", "4")
+                                            .put("enable-schema-evolution", "false")
+                                            .put("foo", "bar")
+                                            .build())));
 
     private final PipelineDef defWithOptional =
             new PipelineDef(
@@ -184,10 +187,11 @@ class YamlPipelineDefinitionParserTest {
                             new RouteDef(
                                     "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
                     null,
-                    Configuration.fromMap(
-                            ImmutableMap.<String, String>builder()
-                                    .put("parallelism", "4")
-                                    .build()));
+                    PipelineConfig.fromConfiguration(
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("parallelism", "4")
+                                            .build())));
 
     private final PipelineDef minimizedDef =
             new PipelineDef(
@@ -195,5 +199,5 @@ class YamlPipelineDefinitionParserTest {
                     new SinkDef("kafka", null, new Configuration()),
                     Collections.emptyList(),
                     null,
-                    new Configuration());
+                    PipelineConfig.fromConfiguration(new Configuration()));
 }

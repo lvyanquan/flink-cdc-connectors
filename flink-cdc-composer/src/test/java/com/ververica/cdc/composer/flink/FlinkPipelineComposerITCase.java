@@ -20,6 +20,7 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.pipeline.PipelineConfig;
 import com.ververica.cdc.common.pipeline.PipelineOptions;
 import com.ververica.cdc.composer.PipelineExecution;
 import com.ververica.cdc.composer.definition.PipelineDef;
@@ -108,7 +109,7 @@ class FlinkPipelineComposerITCase {
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
+        PipelineConfig pipelineConfig = new PipelineConfig();
         pipelineConfig.set(PipelineOptions.GLOBAL_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
@@ -162,7 +163,7 @@ class FlinkPipelineComposerITCase {
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
+        PipelineConfig pipelineConfig = new PipelineConfig();
         pipelineConfig.set(PipelineOptions.GLOBAL_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
@@ -226,7 +227,7 @@ class FlinkPipelineComposerITCase {
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
+        PipelineConfig pipelineConfig = new PipelineConfig();
         pipelineConfig.set(PipelineOptions.GLOBAL_PARALLELISM, MAX_PARALLELISM);
         PipelineDef pipelineDef =
                 new PipelineDef(
