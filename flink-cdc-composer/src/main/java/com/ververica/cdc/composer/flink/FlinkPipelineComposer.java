@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.composer.flink;
 
+import com.ververica.cdc.common.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -48,10 +49,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
-            String host, int port, List<Path> additionalJars) {
+            String host, int port, List<Path> additionalJars, Configuration flinkConfig) {
         String[] jarPaths = additionalJars.stream().map(Path::toString).toArray(String[]::new);
+        org.apache.flink.configuration.Configuration configuration = org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
+
         return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.createRemoteEnvironment(host, port, jarPaths), false);
+                StreamExecutionEnvironment.createRemoteEnvironment(host, port, configuration, jarPaths), false);
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {

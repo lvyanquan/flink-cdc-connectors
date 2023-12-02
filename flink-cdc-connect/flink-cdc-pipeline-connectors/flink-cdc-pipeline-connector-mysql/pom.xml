@@ -161,6 +161,8 @@
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
+                                    <include>com.ververica:flink-cdc-common</include>
+                                    <include>com.ververica:flink-cdc-runtime</include>
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
