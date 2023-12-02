@@ -224,9 +224,9 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         List<Event> actual =
                 fetchRowData(events, 1 + expectedSnapshot.size() + expectedBinlog.size());
         assertThat(actual.get(0)).isEqualTo(createTableEvent);
-        assertThat(actual.subList(11, actual.size())).isEqualTo(expectedBinlog);
         assertThat(actual.subList(1, 10))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        assertThat(actual.subList(10, actual.size())).isEqualTo(expectedBinlog);
     }
 
     @Test

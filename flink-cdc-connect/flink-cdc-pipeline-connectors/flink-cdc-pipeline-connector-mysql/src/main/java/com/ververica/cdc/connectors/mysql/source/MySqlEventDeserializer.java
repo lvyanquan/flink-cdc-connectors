@@ -114,6 +114,6 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
         // TODO: get metadata from source record
-        return new HashMap<>();
+        return null;
     }
 }
