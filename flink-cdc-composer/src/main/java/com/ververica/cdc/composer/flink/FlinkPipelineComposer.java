@@ -58,7 +58,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {
-        return new FlinkPipelineComposer(StreamExecutionEnvironment.createLocalEnvironment(), true);
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(), true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
@@ -68,7 +69,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
-        int parallelism = pipelineDef.getConfig().get(PipelineOptions.GLOBAL_PARALLELISM);
+        int parallelism = pipelineDef.getPipelineConfig().get(PipelineOptions.GLOBAL_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
         // Source
@@ -86,8 +87,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
-                        pipelineDef.getConfig().get(PipelineOptions.SCHEMA_CHANGE_BEHAVIOR),
-                        pipelineDef.getConfig().get(PipelineOptions.SCHEMA_OPERATOR_UID));
+                        pipelineDef.getPipelineConfig().get(PipelineOptions.SCHEMA_CHANGE_BEHAVIOR),
+                        pipelineDef.getPipelineConfig().get(PipelineOptions.SCHEMA_OPERATOR_UID));
         stream =
                 schemaOperatorTranslator.translate(
                         stream, parallelism, dataSink.getMetadataApplier());
@@ -105,7 +106,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         sinkTranslator.translate(stream, dataSink, schemaOperatorIDGenerator.generate());
 
         return new FlinkPipelineExecution(
-                env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
+                env,
+                pipelineDef.getPipelineConfig().get(PipelineOptions.PIPELINE_NAME),
+                isBlocking);
     }
 
     private DataSink createDataSink(SinkDef sinkDef) {

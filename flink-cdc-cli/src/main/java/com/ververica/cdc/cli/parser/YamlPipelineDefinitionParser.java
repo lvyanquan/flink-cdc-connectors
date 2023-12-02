@@ -22,6 +22,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.pipeline.PipelineConfig;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
@@ -86,9 +87,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
 
         // Merge user config into global config
-        Configuration pipelineConfig = new Configuration();
-        pipelineConfig.addAll(globalPipelineConfig);
-        pipelineConfig.addAll(userPipelineConfig);
+        final PipelineConfig pipelineConfig = new PipelineConfig();
+        pipelineConfig.addConfiguration(globalPipelineConfig);
+        pipelineConfig.addConfiguration(userPipelineConfig);
 
         return new PipelineDef(sourceDef, sinkDef, routeDefs, null, pipelineConfig);
     }

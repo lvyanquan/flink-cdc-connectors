@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.composer.definition;
 
-import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.pipeline.PipelineConfig;
 
 import java.util.List;
 import java.util.Objects;
@@ -46,19 +46,19 @@ public class PipelineDef {
     private final SinkDef sink;
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
-    private final Configuration config;
+    private final PipelineConfig pipelineConfig;
 
     public PipelineDef(
             SourceDef source,
             SinkDef sink,
             List<RouteDef> routes,
             List<TransformDef> transforms,
-            Configuration config) {
+            PipelineConfig pipelineConfig) {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
-        this.config = config;
+        this.pipelineConfig = pipelineConfig;
     }
 
     public SourceDef getSource() {
@@ -77,8 +77,8 @@ public class PipelineDef {
         return transforms;
     }
 
-    public Configuration getConfig() {
-        return config;
+    public PipelineConfig getPipelineConfig() {
+        return pipelineConfig;
     }
 
     @Override
@@ -92,8 +92,8 @@ public class PipelineDef {
                 + routes
                 + ", transforms="
                 + transforms
-                + ", config="
-                + config
+                + ", pipelineConfig="
+                + pipelineConfig
                 + '}';
     }
 
@@ -110,11 +110,11 @@ public class PipelineDef {
                 && Objects.equals(sink, that.sink)
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
-                && Objects.equals(config, that.config);
+                && Objects.equals(pipelineConfig, that.pipelineConfig);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, config);
+        return Objects.hash(source, sink, routes, transforms, pipelineConfig);
     }
 }
