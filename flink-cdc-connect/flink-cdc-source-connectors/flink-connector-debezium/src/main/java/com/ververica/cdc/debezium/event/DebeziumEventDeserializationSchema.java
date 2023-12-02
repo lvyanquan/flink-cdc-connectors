@@ -205,7 +205,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return convertToTimestamp(serverTimeZone);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return convertToLocalTimeZoneTimestamp(serverTimeZone);
+                return convertToLocalTimeZoneTimestamp();
             case FLOAT:
                 return convertToFloat();
             case DOUBLE:
@@ -382,8 +382,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         };
     }
 
-    private static DeserializationRuntimeConverter convertToLocalTimeZoneTimestamp(
-            ZoneId serverTimeZone) {
+    private static DeserializationRuntimeConverter convertToLocalTimeZoneTimestamp() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -394,8 +393,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     String str = (String) dbzObj;
                     // TIMESTAMP_LTZ type is encoded in string type
                     Instant instant = Instant.parse(str);
-                    return TimestampData.fromLocalDateTime(
-                            LocalDateTime.ofInstant(instant, serverTimeZone));
+                    return TimestampData.fromMillis(instant.toEpochMilli(), instant.getNano());
                 }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
