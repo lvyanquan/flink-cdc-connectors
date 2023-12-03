@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.ververica.cdc.common.data.ArrayData;
 import com.ververica.cdc.common.data.GenericArrayData;
 import com.ververica.cdc.common.data.GenericMapData;
@@ -30,11 +28,14 @@ import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Date;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,8 @@ public class DorisRowConverter implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** Format DATE type data. */
+    private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
     /** Runtime converter to convert {@link RecordData} type object to doris field. */
     @FunctionalInterface
     interface SerializationConverter extends Serializable {
@@ -94,7 +97,9 @@ public class DorisRowConverter implements Serializable {
             case DOUBLE:
                 return (index, val) -> val.getDouble(index);
             case DATE:
-                return (index, val) -> Date.valueOf(LocalDate.ofEpochDay(val.getInt(index)));
+                return (index, val) ->
+                        DATE_FORMATTER.format(Date.valueOf(
+                                LocalDate.ofEpochDay(val.getInt(index))));
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 final int timestampPrecision = ((TimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, timestampPrecision).toTimestamp();
