@@ -34,7 +34,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,6 +50,11 @@ public class DorisRowConverter implements Serializable {
 
     /** Format DATE type data. */
     private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
+
+    /** Format timestamp-related type data. */
+    private static final DateTimeFormatter DATETIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"));
+
     /** Runtime converter to convert {@link RecordData} type object to doris field. */
     @FunctionalInterface
     interface SerializationConverter extends Serializable {
@@ -105,7 +112,8 @@ public class DorisRowConverter implements Serializable {
                 return (index, val) -> val.getTimestamp(index, timestampPrecision).toTimestamp();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 final int localP = ((LocalZonedTimestampType) type).getPrecision();
-                return (index, val) -> val.getTimestamp(index, localP).toTimestamp();
+                return (index, val) -> DATETIME_FORMATTER.format(
+                        Instant.parse(val.getString(index).toString()));
             case TIMESTAMP_WITH_TIME_ZONE:
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
