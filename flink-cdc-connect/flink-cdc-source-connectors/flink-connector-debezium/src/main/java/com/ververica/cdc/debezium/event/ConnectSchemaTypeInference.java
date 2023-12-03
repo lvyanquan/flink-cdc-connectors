@@ -19,10 +19,13 @@ package com.ververica.cdc.debezium.event;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
+import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 
 /** Utility class to convert {@link Schema} to {@link DataType}. */
 public class ConnectSchemaTypeInference {
+
+    public static final String PRECISION_PARAMETER_KEY = "connect.decimal.precision";
 
     public static DataType infer(Schema schema) {
         return schema.isOptional()
@@ -49,6 +52,14 @@ public class ConnectSchemaTypeInference {
             case STRING:
                 return DataTypes.STRING();
             case BYTES:
+                if (Decimal.LOGICAL_NAME.equals(schema.name())) {
+                    int scale = Integer.parseInt(schema.parameters().get(Decimal.SCALE_FIELD));
+                    int precision =
+                            Integer.parseInt(
+                                    schema.parameters()
+                                            .getOrDefault(PRECISION_PARAMETER_KEY, "20"));
+                    return DataTypes.DECIMAL(precision, scale);
+                }
                 return DataTypes.BYTES();
             case ARRAY:
                 return DataTypes.ARRAY(infer(schema.valueSchema()));

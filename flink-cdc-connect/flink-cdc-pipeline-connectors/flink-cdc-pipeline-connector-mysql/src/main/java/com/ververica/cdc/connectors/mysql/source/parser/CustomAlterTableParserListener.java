@@ -42,7 +42,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.schema.MySqlCdcCommonTypeUtils.fromDbzColumn;
+import static com.ververica.cdc.connectors.mysql.utils.MySqlTypeUtils.fromDbzColumn;
 
 /** Copied from {@link AlterTableParserListener} in Debezium 1.9.7.Final. */
 public class CustomAlterTableParserListener extends MySqlParserBaseListener {

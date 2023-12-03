@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.schema;
+package com.ververica.cdc.connectors.mysql.utils;
 
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import io.debezium.relational.Column;
 
 /** Utilities for converting from MySQL types to {@link DataType}s. */
-public class MySqlCdcCommonTypeUtils {
+public class MySqlTypeUtils {
 
     // ------ MySQL Type ------
     // https://dev.mysql.com/doc/refman/8.0/en/data-types.html
@@ -160,6 +160,9 @@ public class MySqlCdcCommonTypeUtils {
             case DATE:
                 return DataTypes.DATE();
             case DATETIME:
+                return column.length() >= 0
+                        ? DataTypes.TIMESTAMP(column.length())
+                        : DataTypes.TIMESTAMP();
             case TIMESTAMP:
                 return column.length() >= 0
                         ? DataTypes.TIMESTAMP_LTZ(column.length())
@@ -182,5 +185,5 @@ public class MySqlCdcCommonTypeUtils {
         }
     }
 
-    private MySqlCdcCommonTypeUtils() {}
+    private MySqlTypeUtils() {}
 }

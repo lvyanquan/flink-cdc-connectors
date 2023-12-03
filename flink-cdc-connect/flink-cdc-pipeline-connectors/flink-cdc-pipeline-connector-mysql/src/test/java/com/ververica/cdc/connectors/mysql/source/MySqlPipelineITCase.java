@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql;
+package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
@@ -38,8 +38,6 @@ import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
-import com.ververica.cdc.connectors.mysql.source.MySqlDataSource;
-import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
@@ -60,18 +58,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
+import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
+import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
+import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests. */
 public class MySqlPipelineITCase extends MySqlSourceTestBase {
-
-    private static final String TEST_USER = "mysqluser";
-    private static final String TEST_PASSWORD = "mysqlpw";
 
     protected static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0);
@@ -116,7 +113,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
                         .startupOptions(StartupOptions.initial())
-                        .serverId(getServerId())
+                        .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(true);
 
@@ -224,11 +221,11 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     })));
         }
         List<Event> actual =
-                fetchRowData(events, 1 + expectedSnapshot.size() + expectedBinlog.size());
+                fetchResults(events, 1 + expectedSnapshot.size() + expectedBinlog.size());
         assertThat(actual.get(0)).isEqualTo(createTableEvent);
-        assertThat(actual.subList(11, actual.size())).isEqualTo(expectedBinlog);
         assertThat(actual.subList(1, 10))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        assertThat(actual.subList(10, actual.size())).isEqualTo(expectedBinlog);
     }
 
     @Test
@@ -244,7 +241,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
                         .startupOptions(StartupOptions.latest())
-                        .serverId(getServerId())
+                        .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(true);
 
@@ -293,7 +290,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                             Column.physicalColumn(
                                                     "cols4", DataTypes.VARCHAR(55))))));
         }
-        List<Event> actual = fetchRowData(events, expected.size());
+        List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);
     }
 
@@ -550,21 +547,5 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         Collections.singletonList(
                                 Column.physicalColumn("DESC3", DataTypes.BIGINT()))));
         return expected;
-    }
-
-    private String getServerId() {
-        final Random random = new Random();
-        int serverId = random.nextInt(100) + 5400;
-        return serverId + "-" + (serverId + env.getParallelism());
-    }
-
-    private static List<Event> fetchRowData(Iterator<Event> iter, int size) {
-        List<Event> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Event event = iter.next();
-            rows.add(event);
-            size--;
-        }
-        return rows;
     }
 }

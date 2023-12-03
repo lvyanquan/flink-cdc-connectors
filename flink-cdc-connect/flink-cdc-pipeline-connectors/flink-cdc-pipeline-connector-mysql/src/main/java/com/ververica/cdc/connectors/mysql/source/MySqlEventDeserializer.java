@@ -32,7 +32,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -114,6 +113,6 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
         // TODO: get metadata from source record
-        return new HashMap<>();
+        return null;
     }
 }
