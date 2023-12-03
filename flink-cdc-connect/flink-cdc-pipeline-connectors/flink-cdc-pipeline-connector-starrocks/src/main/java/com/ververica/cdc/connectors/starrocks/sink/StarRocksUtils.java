@@ -41,9 +41,11 @@ import com.ververica.cdc.common.types.VarCharType;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static com.ververica.cdc.common.types.DataTypeChecks.getPrecision;
 import static com.ververica.cdc.common.types.DataTypeChecks.getScale;
@@ -116,6 +118,10 @@ public class StarRocksUtils {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final DateTimeFormatter DATETIME_FORMATTER_WITH_ZONE =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
+                    .withZone(ZoneOffset.UTC);
+
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
      * position.
@@ -177,7 +183,7 @@ public class StarRocksUtils {
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 fieldGetter =
                         record ->
-                                DATETIME_FORMATTER.format(
+                                DATETIME_FORMATTER_WITH_ZONE.format(
                                         record.getLocalZonedTimestampData(
                                                         fieldPos, getPrecision(fieldType))
                                                 .toInstant());

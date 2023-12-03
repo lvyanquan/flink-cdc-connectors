@@ -16,6 +16,8 @@
 
 package com.ververical.cdc.connectors.starrocks.sink;
 
+import com.ververica.cdc.common.data.ZonedTimestampData;
+import com.ververica.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
@@ -104,6 +106,7 @@ public class EventRecordSerializationSchemaTest {
                         .physicalColumn("col1", new IntType())
                         .physicalColumn("col2", new BooleanType())
                         .physicalColumn("col3", new TimestampType())
+                        .physicalColumn("col4", new ZonedTimestampType())
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schema1);
@@ -120,7 +123,8 @@ public class EventRecordSerializationSchemaTest {
                                     1,
                                     true,
                                     TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 18:00:00"))
+                                            Timestamp.valueOf("2023-11-27 18:00:00")),
+                                        ZonedTimestampData.of(500, 1, "UTC")
                                 }));
         verifySerializeResult(
                 table1,
