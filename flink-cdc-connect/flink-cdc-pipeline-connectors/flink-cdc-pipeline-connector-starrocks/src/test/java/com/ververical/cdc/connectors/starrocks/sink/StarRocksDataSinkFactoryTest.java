@@ -49,8 +49,8 @@ public class StarRocksDataSinkFactoryTest {
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
-                                conf.toMap(),
                                 conf,
+                                new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
         assertTrue(dataSink instanceof StarRocksDataSink);
     }
