@@ -41,6 +41,8 @@ import com.ververica.cdc.common.types.VarCharType;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -116,6 +118,13 @@ public class StarRocksUtils {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** ZoneId from pipeline config to support timestamp with local time zone. */
+    private static ZoneId pipelineZoneId = ZoneId.systemDefault();
+
+    public static void setPipelineZone(ZoneId zoneId) {
+        pipelineZoneId = zoneId;
+    }
+
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
      * position.
@@ -177,10 +186,13 @@ public class StarRocksUtils {
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 fieldGetter =
                         record ->
-                                DATETIME_FORMATTER.format(
-                                        record.getLocalZonedTimestampData(
-                                                        fieldPos, getPrecision(fieldType))
-                                                .toInstant());
+                                ZonedDateTime.of(
+                                                record.getTimestamp(
+                                                                fieldPos, getPrecision(fieldType))
+                                                        .toLocalDateTime(),
+                                                pipelineZoneId)
+                                        .toLocalDateTime()
+                                        .format(DATETIME_FORMATTER);
                 break;
             default:
                 throw new UnsupportedOperationException(
