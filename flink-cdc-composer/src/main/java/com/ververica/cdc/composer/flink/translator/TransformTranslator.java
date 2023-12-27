@@ -51,29 +51,4 @@ public class TransformTranslator {
         }
         return input.map(transformFunctionBuilder.build(), new EventTypeInfo()).name("Transform");
     }
-
-    public DataStream<Event> translateByTableApi(
-            StreamTableEnvironment tableEnv,
-            DataStream<Event> input,
-            List<TransformDef> transforms) {
-        if (transforms.isEmpty()) {
-            return input;
-        }
-        TransformFunction.Builder transformFunctionBuilder = TransformFunction.newBuilder();
-        for (TransformDef transform : transforms) {
-            transform
-                    .getAddColumn()
-                    .forEach(
-                            (key, value) -> {
-                                transformFunctionBuilder.addTransform(
-                                        value,
-                                        ColumnId.parse(
-                                                TableId.parse(transform.getSinkTable()), key));
-                            });
-        }
-        final Table table = tableEnv.fromDataStream(input);
-        Table table1 = tableEnv.sqlQuery("SELECT * FROM " + table);
-
-        return input.map(transformFunctionBuilder.build(), new EventTypeInfo()).name("Transform");
-    }
 }
