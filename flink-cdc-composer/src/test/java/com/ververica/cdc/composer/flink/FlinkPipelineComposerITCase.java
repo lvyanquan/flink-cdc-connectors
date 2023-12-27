@@ -25,6 +25,7 @@ import com.ververica.cdc.composer.PipelineExecution;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.composer.definition.SourceDef;
+import com.ververica.cdc.composer.definition.TransformDef;
 import com.ververica.cdc.connectors.values.ValuesDatabase;
 import com.ververica.cdc.connectors.values.factory.ValuesDataFactory;
 import com.ververica.cdc.connectors.values.sink.ValuesDataSinkOptions;
@@ -37,8 +38,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
 import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
@@ -247,5 +252,54 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=1;col2=1;col3=x",
                         "default_namespace.default_schema.table1:col1=3;col2=3;col3=x",
                         "default_namespace.default_schema.table1:col1=5;col2=5;col3=");
+    }
+
+    @Test
+    void testTransform() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.TRANSFORM_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        Map<String, String> addColumn = new HashMap<>();
+        addColumn.put("col12", "col1 + col2");
+        TransformDef transformDef =
+                new TransformDef("default_namespace.default_schema.table1", addColumn);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        new ArrayList<>(Arrays.asList(transformDef)),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().replace("\r\n","\n").split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 4], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3, 6], op=INSERT, meta=()}",
+            "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existingColumn=null}]}");
     }
 }

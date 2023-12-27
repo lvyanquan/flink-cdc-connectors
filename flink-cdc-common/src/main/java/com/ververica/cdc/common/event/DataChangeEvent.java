@@ -138,6 +138,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, meta);
     }
 
+    /**
+     * Update the after of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent setAfter(DataChangeEvent dataChangeEvent, RecordData after) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                dataChangeEvent.before,
+                after,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

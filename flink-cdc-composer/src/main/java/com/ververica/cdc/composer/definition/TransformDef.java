@@ -16,9 +16,57 @@
 
 package com.ververica.cdc.composer.definition;
 
+import java.util.Map;
+import java.util.Objects;
+
 /**
  * Definition of transformation.
  *
  * <p>Transformation will be implemented later, therefore we left the class blank.
  */
-public class TransformDef {}
+public class TransformDef {
+    private final String sinkTable;
+    private final Map<String, String> addColumn;
+
+    public TransformDef(String sinkTable, Map<String, String> addColumn) {
+        this.sinkTable = sinkTable;
+        this.addColumn = addColumn;
+    }
+
+    public String getSinkTable() {
+        return sinkTable;
+    }
+
+    public Map<String, String> getAddColumn() {
+        return addColumn;
+    }
+
+    @Override
+    public String toString() {
+        return "TransformDef{"
+                + "sinkTable='"
+                + sinkTable
+                + '\''
+                + ", addColumn="
+                + addColumn
+                + '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        TransformDef that = (TransformDef) o;
+        return Objects.equals(sinkTable, that.sinkTable)
+                && Objects.equals(addColumn, that.addColumn);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(sinkTable, addColumn);
+    }
+}
