@@ -16,14 +16,12 @@
 package com.ververica.cdc.composer.flink.translator;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
-import com.ververica.cdc.common.event.ColumnId;
 import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.composer.definition.TransformDef;
-import com.ververica.cdc.runtime.operators.transform.TransformFunction;
+import com.ververica.cdc.runtime.operators.transform.FilterFunction;
+import com.ververica.cdc.runtime.operators.transform.ProjectionFunction;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
 import java.util.List;
@@ -37,18 +35,19 @@ public class TransformTranslator {
         if (transforms.isEmpty()) {
             return input;
         }
-        TransformFunction.Builder transformFunctionBuilder = TransformFunction.newBuilder();
+
+        ProjectionFunction.Builder projectionFunctionBuilder = ProjectionFunction.newBuilder();
         for (TransformDef transform : transforms) {
-            transform
-                    .getAddColumn()
-                    .forEach(
-                            (key, value) -> {
-                                transformFunctionBuilder.addTransform(
-                                        value,
-                                        ColumnId.parse(
-                                                TableId.parse(transform.getSinkTable()), key));
-                            });
+            projectionFunctionBuilder.addProjection(
+                transform.getSourceTable(), transform.getProjection(), transform.getFilter().get());
         }
-        return input.map(transformFunctionBuilder.build(), new EventTypeInfo()).name("Transform");
+        SingleOutputStreamOperator<Event> singleOutputStreamOperator = input.map(projectionFunctionBuilder.build(), new EventTypeInfo()).name("Transform:Projection");
+
+        FilterFunction.Builder filterFunctionBuilder = FilterFunction.newBuilder();
+        for (TransformDef transform : transforms) {
+            filterFunctionBuilder.addFilter(
+                transform.getSourceTable(), transform.getProjection(), transform.getFilter().get());
+        }
+        return singleOutputStreamOperator.filter(filterFunctionBuilder.build()).name("Transform:Filter");
     }
 }

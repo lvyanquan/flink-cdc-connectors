@@ -35,7 +35,7 @@ import org.apache.flink.configuration.Configuration;
 /**
  * TransformFunctionTest
  */
-public class TransformFunctionTest {
+public class ProjectionFunctionTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -58,8 +58,8 @@ public class TransformFunctionTest {
     @Ignore
     @Test
     void testDataChangeEventTransform() throws Exception {
-        TransformFunction transform =
-                TransformFunction.newBuilder().addTransform("id + 10", CUSTOMERS_COLUMNID).build();
+        ProjectionFunction transform =
+                ProjectionFunction.newBuilder().addProjection("","*,id + 10 as c_id", "").build();
                 transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));

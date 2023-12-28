@@ -16,17 +16,18 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import org.apache.commons.jexl2.Expression;
-import org.apache.commons.jexl2.JexlContext;
-import org.apache.commons.jexl2.JexlEngine;
-import org.apache.commons.jexl2.MapContext;
+
+import org.apache.commons.jexl3.JexlContext;
+import org.apache.commons.jexl3.JexlExpression;
+import org.apache.commons.jexl3.MapContext;
+import org.apache.commons.jexl3.internal.Engine;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
-import com.ververica.cdc.common.event.ColumnId;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.types.DataType;
@@ -39,10 +40,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** A map function that applies user-defined transform logics. */
-public class TransformFunction extends RichMapFunction<Event, Event> {
-    private final List<Tuple2<String, ColumnId>> transformRules;
-    private transient List<Tuple2<Expression, ColumnId>> transformations;
-    private transient JexlEngine jexlEngine;
+public class ProjectionFunction extends RichMapFunction<Event, Event> {
+    private final List<Tuple3<String, String, String>> projectionRules;
+    private transient List<Tuple2<JexlExpression, String>> projection;
+    private transient Engine jexlEngine;
     private transient List<DataType> dataTypes;
     private transient List<String> columnNames;
 
@@ -50,50 +51,54 @@ public class TransformFunction extends RichMapFunction<Event, Event> {
         return new Builder();
     }
 
-    /** Builder of {@link TransformFunction}. */
+    /** Builder of {@link ProjectionFunction}. */
     public static class Builder {
-        private final List<Tuple2<String, ColumnId>> transformRules = new ArrayList<>();
+        private final List<Tuple3<String, String, String>> projectionRules = new ArrayList<>();
 
-        public Builder addTransform(String columnTransform, ColumnId addBy) {
-            transformRules.add(Tuple2.of(columnTransform, addBy));
+        public Builder addProjection(String tableInclusions, String projection, String filter) {
+            projectionRules.add(Tuple3.of(tableInclusions, projection, filter));
             return this;
         }
 
-        public TransformFunction build() {
-            return new TransformFunction(transformRules);
+        public ProjectionFunction build() {
+            return new ProjectionFunction(projectionRules);
         }
     }
 
-    private TransformFunction(List<Tuple2<String, ColumnId>> transformRules) {
-        this.transformRules = transformRules;
+    private ProjectionFunction(List<Tuple3<String, String, String>> projectionRules) {
+        this.projectionRules = projectionRules;
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        jexlEngine = new JexlEngine();
+        jexlEngine = new Engine();
         dataTypes = new ArrayList<>();
         columnNames = new ArrayList<>();
-        transformations =
-            transformRules.stream()
+        projection =
+            projectionRules.stream()
                 .map(
-                    tuple2 -> {
-                        String expressionStr = tuple2.f0;
-                        ColumnId addBy = tuple2.f1;
-                        Expression expression = jexlEngine.createExpression(expressionStr);
-                        return new Tuple2<>(expression, addBy);
+                    tuple3 -> {
+                        String tableInclusions = tuple3.f0;
+                        // todo: parse expression
+//                        String projectionExpression = tuple3.f1;
+                        String projectionExpression = "col1 + col2";
+                        JexlExpression expression = jexlEngine.createExpression(projectionExpression);
+                        return new Tuple2<>(expression, tableInclusions);
                     })
                 .collect(Collectors.toList());
         // todo: Change to retrieve from metadata
         columnNames.add("col1");
         columnNames.add("col2");
+        columnNames.add("col12");
+        dataTypes.add(DataTypes.STRING());
         dataTypes.add(DataTypes.STRING());
         dataTypes.add(DataTypes.STRING());
 
-        for (Tuple2<String, ColumnId> route : transformRules) {
+        /*for (Tuple3<String, String, String> route : projectionRules) {
             ColumnId addBy = route.f1;
             columnNames.add(addBy.getColumnName());
             dataTypes.add(DataTypes.STRING());
-        }
+        }*/
     }
 
     @Override
@@ -113,16 +118,17 @@ public class TransformFunction extends RichMapFunction<Event, Event> {
         for(int i=0;i<after.getArity();i++){
             valueList.add(BinaryStringData.fromString(after.getString(i).toString()));
         }
-        // todo: Change to retrieve from metadata
-        jexlContext.set("col1", after.getString(0).toString());
-        jexlContext.set("col2", after.getString(1).toString());
 
-        for (Tuple2<Expression, ColumnId> route : transformations) {
-            Expression expression = route.f0;
+        for(int i = 0; i<after.getArity();i++){
+            // todo: Convert type
+            jexlContext.set(columnNames.get(i), after.getString(i).toString());
+        }
+
+        for (Tuple2<JexlExpression, String> route : projection) {
+            JexlExpression expression = route.f0;
             Object evaluate = expression.evaluate(jexlContext);
             valueList.add(BinaryStringData.fromString(evaluate.toString()));
         }
-
 
         RowType rowType =
                 RowType.of(

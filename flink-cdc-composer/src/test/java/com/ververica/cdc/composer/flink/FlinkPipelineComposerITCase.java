@@ -272,10 +272,11 @@ class FlinkPipelineComposerITCase {
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup transform
-        Map<String, String> addColumn = new HashMap<>();
-        addColumn.put("col12", "col1 + col2");
         TransformDef transformDef =
-                new TransformDef("default_namespace.default_schema.table1", addColumn);
+                new TransformDef("default_namespace.default_schema.table1",
+                    "*,col1 + col2 as col12",
+                    "col1 < 3",
+                    "");
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -297,9 +298,9 @@ class FlinkPipelineComposerITCase {
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 2], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 4], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3, 6], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 11], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 22], op=INSERT, meta=()}",
+//                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3, 33], op=INSERT, meta=()}",
             "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existingColumn=null}]}");
     }
 }

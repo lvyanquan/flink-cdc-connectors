@@ -18,6 +18,7 @@ package com.ververica.cdc.composer.definition;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Definition of transformation.
@@ -25,31 +26,42 @@ import java.util.Objects;
  * <p>Transformation will be implemented later, therefore we left the class blank.
  */
 public class TransformDef {
-    private final String sinkTable;
-    private final Map<String, String> addColumn;
+    private final String sourceTable;
+    private final String projection;
+    private final String filter;
+    private final String description;
 
-    public TransformDef(String sinkTable, Map<String, String> addColumn) {
-        this.sinkTable = sinkTable;
-        this.addColumn = addColumn;
+    public TransformDef(String sourceTable, String projection, String filter, String description) {
+        this.sourceTable = sourceTable;
+        this.projection = projection;
+        this.filter = filter;
+        this.description = description;
     }
 
-    public String getSinkTable() {
-        return sinkTable;
+    public String getSourceTable() {
+        return sourceTable;
     }
 
-    public Map<String, String> getAddColumn() {
-        return addColumn;
+    public String getProjection() {
+        return projection;
+    }
+
+    public Optional<String> getFilter() {
+        return Optional.ofNullable(filter);
+    }
+
+    public Optional<String> getDescription() {
+        return Optional.ofNullable(description);
     }
 
     @Override
     public String toString() {
-        return "TransformDef{"
-                + "sinkTable='"
-                + sinkTable
-                + '\''
-                + ", addColumn="
-                + addColumn
-                + '}';
+        return "TransformDef{" +
+            "sourceTable='" + sourceTable + '\'' +
+            ", projection='" + projection + '\'' +
+            ", filter='" + filter + '\'' +
+            ", description='" + description + '\'' +
+            '}';
     }
 
     @Override
@@ -61,12 +73,12 @@ public class TransformDef {
             return false;
         }
         TransformDef that = (TransformDef) o;
-        return Objects.equals(sinkTable, that.sinkTable)
-                && Objects.equals(addColumn, that.addColumn);
+        return Objects.equals(sourceTable, that.sourceTable) && Objects.equals(projection, that.projection) && Objects.equals(filter, that.filter) &&
+            Objects.equals(description, that.description);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(sinkTable, addColumn);
+        return Objects.hash(sourceTable, projection, filter, description);
     }
 }

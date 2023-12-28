@@ -26,6 +26,7 @@ import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.composer.definition.SourceDef;
+import com.ververica.cdc.composer.definition.TransformDef;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String SOURCE_KEY = "source";
     private static final String SINK_KEY = "sink";
     private static final String ROUTE_KEY = "route";
+    private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
 
     // Source / sink keys
@@ -52,6 +54,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
     private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
+
+    private static final String TRANSFORM_SOURCE_TABLE_KEY = "source-table";
+    private static final String TRANSFORM_PROJECTION_KEY = "projection";
+    private static final String TRANSFORM_FILTER_KEY = "filter";
+    private static final String TRANSFORM_DESCRIPTION_KEY = "description";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -145,6 +152,30 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .map(JsonNode::asText)
                         .orElse(null);
         return new RouteDef(sourceTable, sinkTable, description);
+    }
+
+    private TransformDef toTransformDef(JsonNode transformNode) {
+        String sourceTable =
+            checkNotNull(
+                transformNode.get(TRANSFORM_SOURCE_TABLE_KEY),
+                "Missing required field \"%s\" in transform configuration",
+                TRANSFORM_SOURCE_TABLE_KEY)
+                .asText();
+        String projection =
+            checkNotNull(
+                transformNode.get(TRANSFORM_PROJECTION_KEY),
+                "Missing required field \"%s\" in transform configuration",
+                TRANSFORM_PROJECTION_KEY)
+                .asText();
+        String filter =
+            Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
+                .map(JsonNode::asText)
+                .orElse(null);
+        String description =
+            Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
+                .map(JsonNode::asText)
+                .orElse(null);
+        return new TransformDef(sourceTable, projection, filter, description);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
