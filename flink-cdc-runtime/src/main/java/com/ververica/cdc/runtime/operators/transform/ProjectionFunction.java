@@ -17,35 +17,24 @@
 package com.ververica.cdc.runtime.operators.transform;
 
 
-import org.apache.commons.jexl3.JexlContext;
-import org.apache.commons.jexl3.JexlExpression;
-import org.apache.commons.jexl3.MapContext;
-import org.apache.commons.jexl3.internal.Engine;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-
-import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.data.binary.BinaryStringData;
-import com.ververica.cdc.common.event.DataChangeEvent;
-import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.types.RowType;
-import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.event.DataChangeEvent;
+import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Selectors;
+
 /** A map function that applies user-defined transform logics. */
 public class ProjectionFunction extends RichMapFunction<Event, Event> {
-    private final List<Tuple3<String, String, String>> projectionRules;
-    private transient List<Tuple2<JexlExpression, String>> projection;
-    private transient Engine jexlEngine;
-    private transient List<DataType> dataTypes;
-    private transient List<String> columnNames;
+    private final List<Tuple2<String, String>> projectionRules;
+    private transient List<Tuple2<Selectors, Projector>> projection;
 
     public static Builder newBuilder() {
         return new Builder();
@@ -53,10 +42,10 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
 
     /** Builder of {@link ProjectionFunction}. */
     public static class Builder {
-        private final List<Tuple3<String, String, String>> projectionRules = new ArrayList<>();
+        private final List<Tuple2<String, String>> projectionRules = new ArrayList<>();
 
-        public Builder addProjection(String tableInclusions, String projection, String filter) {
-            projectionRules.add(Tuple3.of(tableInclusions, projection, filter));
+        public Builder addProjection(String tableInclusions, String projection) {
+            projectionRules.add(Tuple2.of(tableInclusions, projection));
             return this;
         }
 
@@ -65,40 +54,26 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         }
     }
 
-    private ProjectionFunction(List<Tuple3<String, String, String>> projectionRules) {
+    private ProjectionFunction(List<Tuple2<String, String>> projectionRules) {
         this.projectionRules = projectionRules;
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        jexlEngine = new Engine();
-        dataTypes = new ArrayList<>();
-        columnNames = new ArrayList<>();
         projection =
             projectionRules.stream()
                 .map(
-                    tuple3 -> {
-                        String tableInclusions = tuple3.f0;
-                        // todo: parse expression
-//                        String projectionExpression = tuple3.f1;
-                        String projectionExpression = "col1 + col2";
-                        JexlExpression expression = jexlEngine.createExpression(projectionExpression);
-                        return new Tuple2<>(expression, tableInclusions);
+                    tuple2 -> {
+                        String tableInclusions = tuple2.f0;
+                        String projection = tuple2.f1;
+
+                        Selectors selectors =
+                            new Selectors.SelectorsBuilder()
+                                .includeTables(tableInclusions)
+                                .build();
+                        return new Tuple2<>(selectors, Projector.generateProjector(projection));
                     })
                 .collect(Collectors.toList());
-        // todo: Change to retrieve from metadata
-        columnNames.add("col1");
-        columnNames.add("col2");
-        columnNames.add("col12");
-        dataTypes.add(DataTypes.STRING());
-        dataTypes.add(DataTypes.STRING());
-        dataTypes.add(DataTypes.STRING());
-
-        /*for (Tuple3<String, String, String> route : projectionRules) {
-            ColumnId addBy = route.f1;
-            columnNames.add(addBy.getColumnName());
-            dataTypes.add(DataTypes.STRING());
-        }*/
     }
 
     @Override
@@ -108,38 +83,21 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         }
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+        // skip delete event
         if(after == null){
             return event;
         }
-        List<Object> valueList = new ArrayList<>();
+        TableId tableId = dataChangeEvent.tableId();
 
-        JexlContext jexlContext = new MapContext();
-
-        for(int i=0;i<after.getArity();i++){
-            valueList.add(BinaryStringData.fromString(after.getString(i).toString()));
+        for (Tuple2<Selectors, Projector> route : projection) {
+            Selectors selectors = route.f0;
+            if (selectors.isMatch(tableId)) {
+                Projector projector = route.f1;
+                BinaryRecordData data = projector.generateRecordData(after);
+                return DataChangeEvent.setAfter(dataChangeEvent, data);
+            }
         }
 
-        for(int i = 0; i<after.getArity();i++){
-            // todo: Convert type
-            jexlContext.set(columnNames.get(i), after.getString(i).toString());
-        }
-
-        for (Tuple2<JexlExpression, String> route : projection) {
-            JexlExpression expression = route.f0;
-            Object evaluate = expression.evaluate(jexlContext);
-            valueList.add(BinaryStringData.fromString(evaluate.toString()));
-        }
-
-        RowType rowType =
-                RowType.of(
-                        dataTypes.toArray(new DataType[dataTypes.size()]),
-                        columnNames.toArray(new String[columnNames.size()]));
-        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
-        BinaryRecordData data =
-                generator.generate(
-                    valueList.toArray(new Object[columnNames.size()])
-                );
-
-        return DataChangeEvent.setAfter(dataChangeEvent, data);
+        return event;
     }
 }

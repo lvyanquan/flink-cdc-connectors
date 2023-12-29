@@ -15,6 +15,7 @@
  */
 package com.ververica.cdc.composer.flink.translator;
 
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
@@ -22,6 +23,7 @@ import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
 import com.ververica.cdc.runtime.operators.transform.FilterFunction;
 import com.ververica.cdc.runtime.operators.transform.ProjectionFunction;
+import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
 import java.util.List;
@@ -37,17 +39,14 @@ public class TransformTranslator {
         }
 
         ProjectionFunction.Builder projectionFunctionBuilder = ProjectionFunction.newBuilder();
-        for (TransformDef transform : transforms) {
-            projectionFunctionBuilder.addProjection(
-                transform.getSourceTable(), transform.getProjection(), transform.getFilter().get());
-        }
-        SingleOutputStreamOperator<Event> singleOutputStreamOperator = input.map(projectionFunctionBuilder.build(), new EventTypeInfo()).name("Transform:Projection");
-
         FilterFunction.Builder filterFunctionBuilder = FilterFunction.newBuilder();
         for (TransformDef transform : transforms) {
+            projectionFunctionBuilder.addProjection(
+                transform.getSourceTable(), transform.getProjection());
             filterFunctionBuilder.addFilter(
                 transform.getSourceTable(), transform.getProjection(), transform.getFilter().get());
         }
-        return singleOutputStreamOperator.filter(filterFunctionBuilder.build()).name("Transform:Filter");
+        DataStream<Event> projectionOutput = input.map(projectionFunctionBuilder.build(), new EventTypeInfo()).name("Transform:Projection");
+        return projectionOutput.filter(filterFunctionBuilder.build()).name("Transform:Filter");
     }
 }

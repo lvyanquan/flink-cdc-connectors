@@ -17,39 +17,25 @@
 package com.ververica.cdc.runtime.operators.transform;
 
 
-import org.apache.commons.jexl3.JexlContext;
-import org.apache.commons.jexl3.JexlExpression;
-import org.apache.commons.jexl3.MapContext;
-import org.apache.commons.jexl3.internal.Engine;
 import org.apache.flink.api.common.functions.RichFilterFunction;
-import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-
-import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.data.binary.BinaryStringData;
-import com.ververica.cdc.common.event.DataChangeEvent;
-import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.schema.Selectors;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.types.RowType;
-import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.event.DataChangeEvent;
+import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Selectors;
+
 /** A map function that applies user-defined transform logics. */
 public class FilterFunction extends RichFilterFunction<Event> {
     private final List<Tuple3<String, String, String>> filterRules;
-    private transient List<Tuple2<Selectors, JexlExpression>> filters;
-    private transient Engine jexlEngine;
-    private transient List<DataType> dataTypes;
-    private transient List<String> columnNames;
-
+    private transient List<Tuple2<Selectors, RowFilter>> filters;
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -74,31 +60,19 @@ public class FilterFunction extends RichFilterFunction<Event> {
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        jexlEngine = new Engine();
-        dataTypes = new ArrayList<>();
-        columnNames = new ArrayList<>();
         filters =
             filterRules.stream()
                 .map(
                     tuple3 -> {
                         String tableInclusions = tuple3.f0;
                         String filterExpression = tuple3.f2;
-                        JexlExpression expression = jexlEngine.createExpression(filterExpression);
                         Selectors selectors =
                             new Selectors.SelectorsBuilder()
                                 .includeTables(tableInclusions)
                                 .build();
-                        return new Tuple2<>(selectors, expression);
+                        return new Tuple2<>(selectors, RowFilter.generateRowFilter(filterExpression));
                     })
                 .collect(Collectors.toList());
-        // todo: Change to retrieve from metadata
-        columnNames.add("col1");
-        columnNames.add("col2");
-        columnNames.add("col12");
-        dataTypes.add(DataTypes.STRING());
-        dataTypes.add(DataTypes.STRING());
-        dataTypes.add(DataTypes.STRING());
-
     }
 
     @Override
@@ -113,18 +87,11 @@ public class FilterFunction extends RichFilterFunction<Event> {
             return false;
         }
 
-        JexlContext jexlContext = new MapContext();
-
-        for(int i = 0; i<after.getArity();i++){
-            // todo: Convert type
-            jexlContext.set(columnNames.get(i), after.getString(i).toString());
-        }
-
-        for (Tuple2<Selectors, JexlExpression> route : filters) {
+        for (Tuple2<Selectors, RowFilter> route : filters) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
-                JexlExpression expression = route.f1;
-                return (Boolean) expression.evaluate(jexlContext);
+                RowFilter rowFilter = route.f1;
+                return rowFilter.run(after);
             }
         }
 

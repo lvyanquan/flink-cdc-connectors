@@ -84,6 +84,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY));
 
+        // Transforms are optional
+        List<TransformDef> transformDefs = new ArrayList<>();
+        Optional.ofNullable(root.get(TRANSFORM_KEY))
+                .ifPresent(node -> node.forEach(transform -> transformDefs.add(toTransformDef(transform))));
+
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
         Optional.ofNullable(root.get(ROUTE_KEY))
@@ -97,7 +102,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(globalPipelineConfig);
         pipelineConfig.addAll(userPipelineConfig);
 
-        return new PipelineDef(sourceDef, sinkDef, routeDefs, null, pipelineConfig);
+        return new PipelineDef(sourceDef, sinkDef, routeDefs, transformDefs, pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {

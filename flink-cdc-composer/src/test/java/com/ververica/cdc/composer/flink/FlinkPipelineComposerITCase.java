@@ -16,8 +16,25 @@
 
 package com.ververica.cdc.composer.flink;
 
+import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
+import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
+import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.pipeline.PipelineOptions;
@@ -31,24 +48,6 @@ import com.ververica.cdc.connectors.values.factory.ValuesDataFactory;
 import com.ververica.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper;
 import com.ververica.cdc.connectors.values.source.ValuesDataSourceOptions;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
-
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
-import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
-import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
-import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerITCase {
@@ -274,7 +273,7 @@ class FlinkPipelineComposerITCase {
         // Setup transform
         TransformDef transformDef =
                 new TransformDef("default_namespace.default_schema.table1",
-                    "*,col1 + col2 as col12",
+                    "col1,col2,col1 + col2 as col12",
                     "col1 < 3",
                     "");
 

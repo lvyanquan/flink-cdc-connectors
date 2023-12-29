@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.ververica.cdc.runtime.operators.transform;
 
 import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.Test;
 
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.DataChangeEvent;
-import com.ververica.cdc.common.event.OperationType;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
@@ -31,9 +31,9 @@ import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 /**
- * ProjectionFunctionTest
+ * FilterFunctionTest
  */
-public class ProjectionFunctionTest {
+public class FilterFunctionTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -46,14 +46,13 @@ public class ProjectionFunctionTest {
             Schema.newBuilder()
                 .physicalColumn("col1", DataTypes.STRING())
                 .physicalColumn("col2", DataTypes.STRING())
-                    .physicalColumn("col12", DataTypes.STRING())
                     .primaryKey("id")
                     .build();
 
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
-        ProjectionFunction transform =
-                ProjectionFunction.newBuilder().addProjection("my_company.my_branch.customers","col1, col2, col1 + col2 col12").build();
+        FilterFunction transform =
+            FilterFunction.newBuilder().addFilter("my_company.my_branch.customers","col1, col2","col1 < 2").build();
                 transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
@@ -63,13 +62,12 @@ public class ProjectionFunctionTest {
                         CUSTOMERS_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}));
-        assertThat(transform.map(insertEvent))
-                .asDataChangeEvent()
-                .hasTableId(CUSTOMERS_TABLEID)
-                .hasOperationType(OperationType.INSERT)
-                .withAfterRecordData()
-                .hasArity(3)
-                .withSchema(EXPECT_SCHEMA)
-                .hasFields(new BinaryStringData("1"), new BinaryStringData("1"), new BinaryStringData("11"));
+        DataChangeEvent insertEvent2 =
+            DataChangeEvent.insertEvent(
+                CUSTOMERS_TABLEID,
+                recordDataGenerator.generate(
+                    new Object[] {new BinaryStringData("2"), new BinaryStringData("2")}));
+        assertThat(transform.filter(insertEvent)).isTrue();
+        assertThat(transform.filter(insertEvent2)).isFalse();
     }
 }

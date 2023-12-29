@@ -13,37 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.ververica.cdc.common.event;
 
-import com.ververica.cdc.common.annotation.PublicEvolving;
+package com.ververica.cdc.runtime.operators.transform;
+
+import org.apache.calcite.sql.SqlBasicCall;
 
 import java.io.Serializable;
 
 /**
- * ColumnId
+ * ColumnTransform
  *
- * @author qiwenkai
- * @since 2023/12/26 14:06
  */
-@PublicEvolving
-public class ColumnId implements Serializable {
-    private final TableId tableId;
+public class ColumnTransform implements Serializable {
     private final String columnName;
+    private final SqlBasicCall transform;
 
-    public ColumnId(TableId tableId, String columnName) {
-        this.tableId = tableId;
+    public ColumnTransform(String columnName, SqlBasicCall transform) {
         this.columnName = columnName;
-    }
-
-    public TableId getTableId() {
-        return tableId;
+        this.transform = transform;
     }
 
     public String getColumnName() {
         return columnName;
     }
 
-    public static ColumnId parse(TableId tableId, String columnName) {
-        return new ColumnId(tableId, columnName);
+    public SqlBasicCall getTransform() {
+        return transform;
+    }
+
+    public static ColumnTransform of(String columnName){
+        return new ColumnTransform(columnName, null);
+    }
+
+    public static ColumnTransform of(String columnName, SqlBasicCall transform){
+        return new ColumnTransform(columnName,transform);
     }
 }

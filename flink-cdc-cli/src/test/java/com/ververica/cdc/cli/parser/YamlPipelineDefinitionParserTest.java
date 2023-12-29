@@ -24,6 +24,8 @@ import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.composer.definition.SourceDef;
+import com.ververica.cdc.composer.definition.TransformDef;
+
 import org.junit.jupiter.api.Test;
 
 import java.net.URL;
@@ -177,7 +179,15 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
-                    null,
+                    Arrays.asList(
+                            new TransformDef("mydb.app_order_.*",
+                                    "id, order_id, TO_UPPER(product_name)",
+                                    "id > 10 AND order_id > 100",
+                                    "project fields from source table"),
+                            new TransformDef("mydb.web_order_.*",
+                                    "CONCAT(id, order_id) as uniq_id, *",
+                                    "uniq_id > 10",
+                                    "add new uniq_id for each row")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
