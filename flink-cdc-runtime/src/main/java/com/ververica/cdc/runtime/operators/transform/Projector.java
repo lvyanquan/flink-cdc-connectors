@@ -103,10 +103,7 @@ public class Projector {
         return includeAllSourceColumnIndex > -1;
     }
 
-    public void applyProjector(SchemaChangeEvent schemaChangeEvent) {
-        if(!includeAllSourceColumn()){
-            return;
-        }
+    public SchemaChangeEvent applyProjector(SchemaChangeEvent schemaChangeEvent) {
         if(schemaChangeEvent instanceof CreateTableEvent){
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
             List<Column> sourceColumns = createTableEvent.getSchema().getColumns();
@@ -114,11 +111,15 @@ public class Projector {
             sourceColumns.forEach(sourceColumn->{
                 sourceColumnTransform.add(ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
             });
-            columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
+            if(includeAllSourceColumn()){
+                columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
+            }
             recordDataGenerator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
             // add the column of projection into Schema
-            createTableEvent.getSchema().copy(toColumnList(columnTransformList));
+            Schema schema = createTableEvent.getSchema().copy(toColumnList(columnTransformList));
+            return new CreateTableEvent(createTableEvent.tableId(), schema);
         }
+        return schemaChangeEvent;
     }
 
     public BinaryRecordData generateRecordData(BinaryRecordData after, List<Column> columns) {

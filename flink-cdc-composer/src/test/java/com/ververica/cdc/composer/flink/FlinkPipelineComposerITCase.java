@@ -254,7 +254,6 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=5;col2=5;col3=");
     }
 
-    @Ignore
     @Test
     void testTransform() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
@@ -275,7 +274,7 @@ class FlinkPipelineComposerITCase {
         // Setup transform
         TransformDef transformDef =
                 new TransformDef("default_namespace.default_schema.table1",
-                    "col1,col2,col1 + col2 as col12",
+                    "*,col1 + col2 as col12",
                     "col1 < 3",
                     "");
 

@@ -33,6 +33,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
@@ -112,7 +113,7 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         return event;
     }
 
-    private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent){
+    private SchemaChangeEvent transformCreateTableEvent(CreateTableEvent createTableEvent){
         List<Column> sourceColumn = new ArrayList<>(Arrays.asList(new Column[createTableEvent.getSchema().getColumns().size()]));
         Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
         sourceColumnMap.put(createTableEvent.tableId(), sourceColumn);
@@ -122,7 +123,7 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
                 // update the column of projection and add the column of projection into Schema
-                projector.applyProjector(createTableEvent);
+                return projector.applyProjector(createTableEvent);
             }
         }
         return createTableEvent;
