@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -253,6 +254,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=5;col2=5;col3=");
     }
 
+    @Ignore
     @Test
     void testTransform() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();

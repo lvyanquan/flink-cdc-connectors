@@ -22,20 +22,27 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
+import com.ververica.cdc.common.types.DataField;
 
 /** A map function that applies user-defined transform logics. */
 public class ProjectionFunction extends RichMapFunction<Event, Event> {
     private final List<Tuple2<String, String>> projectionRules;
     private transient List<Tuple2<Selectors, Projector>> projection;
-
+    private final Map<TableId, List<Column>> sourceColumnMap;
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -56,6 +63,7 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
 
     private ProjectionFunction(List<Tuple2<String, String>> projectionRules) {
         this.projectionRules = projectionRules;
+        this.sourceColumnMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -78,6 +86,9 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
 
     @Override
     public Event map(Event event) throws Exception {
+        if(event instanceof CreateTableEvent){
+            return transformCreateTableEvent((CreateTableEvent) event);
+        }
         if (!(event instanceof DataChangeEvent)) {
             return event;
         }
@@ -93,11 +104,27 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
-                BinaryRecordData data = projector.generateRecordData(after);
+                BinaryRecordData data = projector.generateRecordData(after, sourceColumnMap.get(tableId));
                 return DataChangeEvent.setAfter(dataChangeEvent, data);
             }
         }
 
         return event;
+    }
+
+    private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent){
+        List<Column> sourceColumn = new ArrayList<>(Arrays.asList(new Column[createTableEvent.getSchema().getColumns().size()]));
+        Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
+        sourceColumnMap.put(createTableEvent.tableId(), sourceColumn);
+        TableId tableId = createTableEvent.tableId();
+        for (Tuple2<Selectors, Projector> route : projection) {
+            Selectors selectors = route.f0;
+            if (selectors.isMatch(tableId)) {
+                Projector projector = route.f1;
+                // update the column of projection and add the column of projection into Schema
+                projector.applyProjector(createTableEvent);
+            }
+        }
+        return createTableEvent;
     }
 }

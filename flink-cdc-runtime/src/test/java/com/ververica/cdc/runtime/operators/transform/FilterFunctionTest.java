@@ -23,6 +23,7 @@ import org.apache.flink.configuration.Configuration;
 import org.junit.jupiter.api.Test;
 
 import com.ververica.cdc.common.data.binary.BinaryStringData;
+import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
@@ -51,9 +52,12 @@ public class FilterFunctionTest {
 
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
         FilterFunction transform =
-            FilterFunction.newBuilder().addFilter("my_company.my_branch.customers","col1, col2","col1 < 2").build();
+            FilterFunction.newBuilder().addFilter(CUSTOMERS_TABLEID.identifier(),"col1, col2","col1 < 2").build();
                 transform.open(new Configuration());
+        transform.filter(createTableEvent);
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
         // Insert

@@ -22,12 +22,13 @@ import org.apache.commons.jexl3.JexlExpression;
 import org.apache.commons.jexl3.MapContext;
 import org.apache.commons.jexl3.internal.Engine;
 
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.data.binary.BinaryStringData;
+import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 
 /**
@@ -36,7 +37,7 @@ import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 public class RowFilter {
     private final Set<String> columnNames;
     private final JexlExpression expression;
-
+    private static final Engine jexlEngine = new Engine();
     public RowFilter(Set<String> columnNames, JexlExpression expression) {
         this.columnNames = columnNames;
         this.expression = expression;
@@ -57,24 +58,41 @@ public class RowFilter {
     public static RowFilter generateRowFilter(String filterExpression) {
         SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
         Set<String> columnNames = FlinkSqlParser.generateColumnNames(sqlSelect.getWhere());
-        Engine jexlEngine = new Engine();
         JexlExpression expression = jexlEngine.createExpression(filterExpression);
         return of(columnNames, expression);
     }
 
-    public boolean run(BinaryRecordData after) {
+    public boolean run(BinaryRecordData after, List<Column> columns) {
         JexlContext jexlContext = new MapContext();
-        Map<String, Object> originalValueMap = new ConcurrentHashMap<>();
-
-        // todo: Obtain original values based on field names
-        for(int i=0;i<after.getArity();i++){
-            originalValueMap.put("col"+(i+1),BinaryStringData.fromString(after.getString(i).toString()));
+        for (int i = 0; i < columns.size(); i++) {
+            jexlContext.set(columns.get(i).getName(), fromDataType(after.getString(i), columns.get(i).getType()));
         }
-
-        for (String columnName: columnNames) {
-            jexlContext.set(columnName, originalValueMap.get(columnName).toString());
-        }
-
         return (Boolean) expression.evaluate(jexlContext);
+    }
+
+    private Object fromDataType(Object value, DataType dataType){
+        if(value == null){
+            return value;
+        }
+        switch (dataType.getTypeRoot()){
+            case CHAR:
+            case VARCHAR:
+                return value.toString();
+            case DECIMAL:
+                return BigDecimal.valueOf((long) value);
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+                return Integer.parseInt(value.toString());
+            case FLOAT:
+                return Float.parseFloat(value.toString());
+            case DOUBLE:
+                return Double.parseDouble(value.toString());
+            case BOOLEAN:
+                return Boolean.parseBoolean(value.toString());
+            default:
+                return value;
+        }
     }
 }

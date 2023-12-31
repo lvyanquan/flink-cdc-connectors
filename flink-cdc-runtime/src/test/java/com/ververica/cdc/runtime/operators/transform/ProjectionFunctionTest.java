@@ -22,6 +22,7 @@ import org.apache.flink.configuration.Configuration;
 import org.junit.jupiter.api.Test;
 
 import com.ververica.cdc.common.data.binary.BinaryStringData;
+import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.OperationType;
 import com.ververica.cdc.common.event.TableId;
@@ -42,6 +43,12 @@ public class ProjectionFunctionTest {
                     .physicalColumn("col2", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
+    private static final Schema CUSTOMERS_SOURCE_SCHEMA =
+        Schema.newBuilder()
+            .physicalColumn("col1", DataTypes.STRING())
+            .physicalColumn("col2", DataTypes.STRING())
+            .primaryKey("col1")
+            .build();
     private static final Schema EXPECT_SCHEMA =
             Schema.newBuilder()
                 .physicalColumn("col1", DataTypes.STRING())
@@ -52,17 +59,22 @@ public class ProjectionFunctionTest {
 
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
         ProjectionFunction transform =
-                ProjectionFunction.newBuilder().addProjection("my_company.my_branch.customers","col1, col2, col1 + col2 col12").build();
+                ProjectionFunction.newBuilder().addProjection(CUSTOMERS_TABLEID.identifier(),"*, col1 + col2 col12").build();
                 transform.open(new Configuration());
+        transform.map(createTableEvent);
+
         BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SOURCE_SCHEMA.toRowDataType()));
+
         // Insert
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
                         CUSTOMERS_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}));
+                                new Object[] {new BinaryStringData("1"), new BinaryStringData("2")}));
         assertThat(transform.map(insertEvent))
                 .asDataChangeEvent()
                 .hasTableId(CUSTOMERS_TABLEID)
@@ -70,6 +82,6 @@ public class ProjectionFunctionTest {
                 .withAfterRecordData()
                 .hasArity(3)
                 .withSchema(EXPECT_SCHEMA)
-                .hasFields(new BinaryStringData("1"), new BinaryStringData("1"), new BinaryStringData("11"));
+                .hasFields(new BinaryStringData("1"), new BinaryStringData("2"), new BinaryStringData("12"));
     }
 }

@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
 
@@ -95,13 +96,13 @@ public class FlinkSqlParser {
                             columnName = ((SqlIdentifier) sqlNode1).getSimple();
                         }
                     }
-                    columnTransformList.add(ColumnTransform.of(columnName, transform));
+                    columnTransformList.add(ColumnTransform.of(columnName, DataTypes.STRING(), transform));
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                columnTransformList.add(ColumnTransform.of(sqlIdentifier.getSimple()));
+                columnTransformList.add(ColumnTransform.of(sqlIdentifier.getSimple(), DataTypes.STRING()));
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }

@@ -15,18 +15,15 @@
  */
 package com.ververica.cdc.composer.flink.translator;
 
-import org.apache.calcite.sql.SqlSelect;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+
+import java.util.List;
 
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
 import com.ververica.cdc.runtime.operators.transform.FilterFunction;
 import com.ververica.cdc.runtime.operators.transform.ProjectionFunction;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
-
-import java.util.List;
 
 /**
  * TransformTranslator

@@ -498,7 +498,6 @@ public class ValuesDataSourceHelper {
             Schema.newBuilder()
                 .physicalColumn("col1", DataTypes.STRING())
                 .physicalColumn("col2", DataTypes.STRING())
-                .physicalColumn("col12", DataTypes.STRING())
                 .primaryKey("col1")
                 .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);

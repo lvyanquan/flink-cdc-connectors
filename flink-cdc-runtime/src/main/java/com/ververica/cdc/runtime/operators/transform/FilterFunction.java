@@ -23,19 +23,26 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
 
 /** A map function that applies user-defined transform logics. */
 public class FilterFunction extends RichFilterFunction<Event> {
     private final List<Tuple3<String, String, String>> filterRules;
     private transient List<Tuple2<Selectors, RowFilter>> filters;
+    private final Map<TableId, List<Column>> columnMap;
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -56,6 +63,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
 
     private FilterFunction(List<Tuple3<String, String, String>> filterRules) {
         this.filterRules = filterRules;
+        this.columnMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -77,6 +85,10 @@ public class FilterFunction extends RichFilterFunction<Event> {
 
     @Override
     public boolean filter(Event event) throws Exception {
+        if(event instanceof CreateTableEvent){
+            transformCreateTableEvent((CreateTableEvent) event);
+            return true;
+        }
         if (!(event instanceof DataChangeEvent)) {
             return true;
         }
@@ -91,10 +103,16 @@ public class FilterFunction extends RichFilterFunction<Event> {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 RowFilter rowFilter = route.f1;
-                return rowFilter.run(after);
+                return rowFilter.run(after, columnMap.get(tableId));
             }
         }
 
         return true;
+    }
+
+    private void transformCreateTableEvent(CreateTableEvent createTableEvent){
+        List<Column> sourceColumn = new ArrayList<>(Arrays.asList(new Column[createTableEvent.getSchema().getColumns().size()]));
+        Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
+        columnMap.put(createTableEvent.tableId(), sourceColumn);
     }
 }
