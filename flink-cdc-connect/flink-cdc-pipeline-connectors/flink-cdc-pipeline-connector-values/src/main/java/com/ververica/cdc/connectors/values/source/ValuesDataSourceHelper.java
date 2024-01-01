@@ -102,7 +102,7 @@ public class ValuesDataSourceHelper {
                 {
                     break;
                 }
-                case TRANSFORM_TABLE:
+            case TRANSFORM_TABLE:
                 {
                     sourceEvents = transformTable();
                     break;
@@ -495,51 +495,51 @@ public class ValuesDataSourceHelper {
 
         // create table
         Schema schema =
-            Schema.newBuilder()
-                .physicalColumn("col1", DataTypes.STRING())
-                .physicalColumn("col2", DataTypes.STRING())
-                .primaryKey("col1")
-                .build();
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
         split1.add(createTableEvent);
 
         BinaryRecordDataGenerator generator =
-            new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         // insert
         DataChangeEvent insertEvent1 =
-            DataChangeEvent.insertEvent(
-                TABLE_1,
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("1"),
-                        BinaryStringData.fromString("1")
-                    }));
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
-            DataChangeEvent.insertEvent(
-                TABLE_1,
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("2"),
-                        BinaryStringData.fromString("2")
-                    }));
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
-            DataChangeEvent.insertEvent(
-                TABLE_1,
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("3"),
-                        BinaryStringData.fromString("3")
-                    }));
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
         split1.add(insertEvent3);
 
         // add column
         AddColumnEvent.ColumnWithPosition columnWithPosition =
-            new AddColumnEvent.ColumnWithPosition(
-                Column.physicalColumn("col3", DataTypes.STRING()));
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("col3", DataTypes.STRING()));
         AddColumnEvent addColumnEvent =
-            new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
+                new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
         split1.add(addColumnEvent);
 
         // rename column
@@ -559,28 +559,28 @@ public class ValuesDataSourceHelper {
 
         // delete
         /*split1.add(
-            DataChangeEvent.deleteEvent(
-                TABLE_1,
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("1"),
-                        BinaryStringData.fromString("1")
-                    })));*/
+        DataChangeEvent.deleteEvent(
+            TABLE_1,
+            generator.generate(
+                new Object[] {
+                    BinaryStringData.fromString("1"),
+                    BinaryStringData.fromString("1")
+                })));*/
 
         // update
         /*split1.add(
-            DataChangeEvent.updateEvent(
-                TABLE_1,
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("2"),
-                        BinaryStringData.fromString("")
-                    }),
-                generator.generate(
-                    new Object[] {
-                        BinaryStringData.fromString("2"),
-                        BinaryStringData.fromString("x")
-                    })));*/
+        DataChangeEvent.updateEvent(
+            TABLE_1,
+            generator.generate(
+                new Object[] {
+                    BinaryStringData.fromString("2"),
+                    BinaryStringData.fromString("")
+                }),
+            generator.generate(
+                new Object[] {
+                    BinaryStringData.fromString("2"),
+                    BinaryStringData.fromString("x")
+                })));*/
 
         eventOfSplits.add(split1);
         return eventOfSplits;

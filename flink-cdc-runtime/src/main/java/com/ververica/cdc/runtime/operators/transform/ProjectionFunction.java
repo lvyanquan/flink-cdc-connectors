@@ -16,18 +16,9 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -37,13 +28,21 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
-import com.ververica.cdc.common.types.DataField;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** A map function that applies user-defined transform logics. */
 public class ProjectionFunction extends RichMapFunction<Event, Event> {
     private final List<Tuple2<String, String>> projectionRules;
     private transient List<Tuple2<Selectors, Projector>> projection;
     private final Map<TableId, List<Column>> sourceColumnMap;
+
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -70,24 +69,25 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
     @Override
     public void open(Configuration parameters) throws Exception {
         projection =
-            projectionRules.stream()
-                .map(
-                    tuple2 -> {
-                        String tableInclusions = tuple2.f0;
-                        String projection = tuple2.f1;
+                projectionRules.stream()
+                        .map(
+                                tuple2 -> {
+                                    String tableInclusions = tuple2.f0;
+                                    String projection = tuple2.f1;
 
-                        Selectors selectors =
-                            new Selectors.SelectorsBuilder()
-                                .includeTables(tableInclusions)
-                                .build();
-                        return new Tuple2<>(selectors, Projector.generateProjector(projection));
-                    })
-                .collect(Collectors.toList());
+                                    Selectors selectors =
+                                            new Selectors.SelectorsBuilder()
+                                                    .includeTables(tableInclusions)
+                                                    .build();
+                                    return new Tuple2<>(
+                                            selectors, Projector.generateProjector(projection));
+                                })
+                        .collect(Collectors.toList());
     }
 
     @Override
     public Event map(Event event) throws Exception {
-        if(event instanceof CreateTableEvent){
+        if (event instanceof CreateTableEvent) {
             return transformCreateTableEvent((CreateTableEvent) event);
         }
         if (!(event instanceof DataChangeEvent)) {
@@ -96,7 +96,7 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         // skip delete event
-        if(after == null){
+        if (after == null) {
             return event;
         }
         TableId tableId = dataChangeEvent.tableId();
@@ -105,7 +105,8 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
-                BinaryRecordData data = projector.generateRecordData(after, sourceColumnMap.get(tableId));
+                BinaryRecordData data =
+                        projector.generateRecordData(after, sourceColumnMap.get(tableId));
                 return DataChangeEvent.setAfter(dataChangeEvent, data);
             }
         }
@@ -113,8 +114,11 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         return event;
     }
 
-    private SchemaChangeEvent transformCreateTableEvent(CreateTableEvent createTableEvent){
-        List<Column> sourceColumn = new ArrayList<>(Arrays.asList(new Column[createTableEvent.getSchema().getColumns().size()]));
+    private SchemaChangeEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
+        List<Column> sourceColumn =
+                new ArrayList<>(
+                        Arrays.asList(
+                                new Column[createTableEvent.getSchema().getColumns().size()]));
         Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
         sourceColumnMap.put(createTableEvent.tableId(), sourceColumn);
         TableId tableId = createTableEvent.tableId();

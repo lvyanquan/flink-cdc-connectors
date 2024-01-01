@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
+import com.ververica.cdc.common.types.DataType;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.JexlExpression;
@@ -23,12 +24,7 @@ import org.apache.commons.jexl3.internal.Engine;
 
 import java.io.Serializable;
 
-import com.ververica.cdc.common.types.DataType;
-
-/**
- * ColumnTransform
- *
- */
+/** The ColumnTransform applies to describe the information of the transformation column. */
 public class ColumnTransform implements Serializable {
     private final String columnName;
     private final DataType dataType;
@@ -40,9 +36,9 @@ public class ColumnTransform implements Serializable {
         this.columnName = columnName;
         this.dataType = dataType;
         this.transform = transform;
-        if(transform != null) {
-            this.expression = jexlEngine.createExpression(transform.toString().replace( "`",""));
-        }else {
+        if (transform != null) {
+            this.expression = jexlEngine.createExpression(transform.toString().replace("`", ""));
+        } else {
             this.expression = null;
         }
     }
@@ -63,15 +59,15 @@ public class ColumnTransform implements Serializable {
         return expression;
     }
 
-    public Object evaluate(JexlContext jexlContext){
+    public Object evaluate(JexlContext jexlContext) {
         return expression.evaluate(jexlContext);
     }
 
-    public static ColumnTransform of(String columnName, DataType dataType){
+    public static ColumnTransform of(String columnName, DataType dataType) {
         return new ColumnTransform(columnName, dataType, null);
     }
 
-    public static ColumnTransform of(String columnName, DataType dataType, SqlBasicCall transform){
-        return new ColumnTransform(columnName,dataType,transform);
+    public static ColumnTransform of(String columnName, DataType dataType, SqlBasicCall transform) {
+        return new ColumnTransform(columnName, dataType, transform);
     }
 }

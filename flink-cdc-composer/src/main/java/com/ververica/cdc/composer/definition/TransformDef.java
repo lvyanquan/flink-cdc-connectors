@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.composer.definition;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -56,12 +55,20 @@ public class TransformDef {
 
     @Override
     public String toString() {
-        return "TransformDef{" +
-            "sourceTable='" + sourceTable + '\'' +
-            ", projection='" + projection + '\'' +
-            ", filter='" + filter + '\'' +
-            ", description='" + description + '\'' +
-            '}';
+        return "TransformDef{"
+                + "sourceTable='"
+                + sourceTable
+                + '\''
+                + ", projection='"
+                + projection
+                + '\''
+                + ", filter='"
+                + filter
+                + '\''
+                + ", description='"
+                + description
+                + '\''
+                + '}';
     }
 
     @Override
@@ -73,8 +80,10 @@ public class TransformDef {
             return false;
         }
         TransformDef that = (TransformDef) o;
-        return Objects.equals(sourceTable, that.sourceTable) && Objects.equals(projection, that.projection) && Objects.equals(filter, that.filter) &&
-            Objects.equals(description, that.description);
+        return Objects.equals(sourceTable, that.sourceTable)
+                && Objects.equals(projection, that.projection)
+                && Objects.equals(filter, that.filter)
+                && Objects.equals(description, that.description);
     }
 
     @Override

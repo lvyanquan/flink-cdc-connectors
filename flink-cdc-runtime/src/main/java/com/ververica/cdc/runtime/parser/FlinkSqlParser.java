@@ -16,16 +16,6 @@
 
 package com.ververica.cdc.runtime.parser;
 
-import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
-
-import org.apache.calcite.config.Lex;
-import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.sql.parser.validate.FlinkSqlConformance;
 import org.apache.flink.table.api.SqlDialect;
@@ -35,18 +25,26 @@ import org.apache.flink.table.planner.delegation.FlinkSqlParserFactories;
 import org.apache.flink.table.planner.parse.CalciteParser;
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 
+import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.utils.StringUtils;
+import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
+import org.apache.calcite.config.Lex;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.validate.SqlConformance;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
+import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
 
-/**
- * Use Flink's calcite parser to parse the statement of flink cdc pipeline transform.
- */
+/** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class FlinkSqlParser {
 
     private static final CalciteParser calciteParser = getCalciteParser();
@@ -55,19 +53,21 @@ public class FlinkSqlParser {
         TableConfig tableConfig = TableConfig.getDefault();
         tableConfig.setSqlDialect(SqlDialect.DEFAULT);
         CalciteConfig calciteConfig = getCalciteConfig(tableConfig);
-        SqlParser.Config sqlParserConfig = JavaScalaConversionUtil.<SqlParser.Config>toJava(
-                calciteConfig.getSqlParserConfig())
-            .orElseGet(
-                // we use Java lex because back ticks are easier than double quotes in
-                // programming and cases are preserved
-                () -> {
-                    SqlConformance conformance = FlinkSqlConformance.DEFAULT;
-                    return SqlParser.config()
-                        .withParserFactory(FlinkSqlParserFactories.create(conformance))
-                        .withConformance(conformance)
-                        .withLex(Lex.JAVA)
-                        .withIdentifierMaxLength(256);
-                });
+        SqlParser.Config sqlParserConfig =
+                JavaScalaConversionUtil.<SqlParser.Config>toJava(calciteConfig.getSqlParserConfig())
+                        .orElseGet(
+                                // we use Java lex because back ticks are easier than double quotes
+                                // in
+                                // programming and cases are preserved
+                                () -> {
+                                    SqlConformance conformance = FlinkSqlConformance.DEFAULT;
+                                    return SqlParser.config()
+                                            .withParserFactory(
+                                                    FlinkSqlParserFactories.create(conformance))
+                                            .withConformance(conformance)
+                                            .withLex(Lex.JAVA)
+                                            .withIdentifierMaxLength(256);
+                                });
         return new CalciteParser(sqlParserConfig);
     }
 
@@ -96,13 +96,15 @@ public class FlinkSqlParser {
                             columnName = ((SqlIdentifier) sqlNode1).getSimple();
                         }
                     }
-                    columnTransformList.add(ColumnTransform.of(columnName, DataTypes.STRING(), transform));
+                    columnTransformList.add(
+                            ColumnTransform.of(columnName, DataTypes.STRING(), transform));
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                columnTransformList.add(ColumnTransform.of(sqlIdentifier.getSimple(), DataTypes.STRING()));
+                columnTransformList.add(
+                        ColumnTransform.of(sqlIdentifier.getSimple(), DataTypes.STRING()));
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }
@@ -151,5 +153,4 @@ public class FlinkSqlParser {
         }
         return FlinkSqlParser.parseSelect(statement.toString());
     }
-
 }

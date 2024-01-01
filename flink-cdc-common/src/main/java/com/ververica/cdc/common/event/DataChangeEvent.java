@@ -139,7 +139,7 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     }
 
     /**
-     * Update the after of a {@link DataChangeEvent} instance that describes the event with meta
+     * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */
     public static DataChangeEvent setAfter(DataChangeEvent dataChangeEvent, RecordData after) {

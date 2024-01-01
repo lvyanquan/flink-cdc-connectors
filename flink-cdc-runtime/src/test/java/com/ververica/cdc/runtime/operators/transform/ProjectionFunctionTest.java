@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.ververica.cdc.runtime.operators.transform;
 
-import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
-
 import org.apache.flink.configuration.Configuration;
-
-import org.junit.jupiter.api.Test;
 
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -30,10 +27,11 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.junit.jupiter.api.Test;
 
-/**
- * ProjectionFunctionTest
- */
+import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
+
+/** Unit tests for the {@link ProjectionFunction}. */
 public class ProjectionFunctionTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -44,15 +42,15 @@ public class ProjectionFunctionTest {
                     .primaryKey("col1")
                     .build();
     private static final Schema CUSTOMERS_SOURCE_SCHEMA =
-        Schema.newBuilder()
-            .physicalColumn("col1", DataTypes.STRING())
-            .physicalColumn("col2", DataTypes.STRING())
-            .primaryKey("col1")
-            .build();
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col2", DataTypes.STRING())
+                    .primaryKey("col1")
+                    .build();
     private static final Schema EXPECT_SCHEMA =
             Schema.newBuilder()
-                .physicalColumn("col1", DataTypes.STRING())
-                .physicalColumn("col2", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
                     .primaryKey("id")
                     .build();
@@ -60,10 +58,13 @@ public class ProjectionFunctionTest {
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
         // Create table
-        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
         ProjectionFunction transform =
-                ProjectionFunction.newBuilder().addProjection(CUSTOMERS_TABLEID.identifier(),"*, col1 + col2 col12").build();
-                transform.open(new Configuration());
+                ProjectionFunction.newBuilder()
+                        .addProjection(CUSTOMERS_TABLEID.identifier(), "*, col1 + col2 col12")
+                        .build();
+        transform.open(new Configuration());
         transform.map(createTableEvent);
 
         BinaryRecordDataGenerator recordDataGenerator =
@@ -74,7 +75,9 @@ public class ProjectionFunctionTest {
                 DataChangeEvent.insertEvent(
                         CUSTOMERS_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("1"), new BinaryStringData("2")}));
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2")
+                                }));
         assertThat(transform.map(insertEvent))
                 .asDataChangeEvent()
                 .hasTableId(CUSTOMERS_TABLEID)
@@ -82,6 +85,9 @@ public class ProjectionFunctionTest {
                 .withAfterRecordData()
                 .hasArity(3)
                 .withSchema(EXPECT_SCHEMA)
-                .hasFields(new BinaryStringData("1"), new BinaryStringData("2"), new BinaryStringData("12"));
+                .hasFields(
+                        new BinaryStringData("1"),
+                        new BinaryStringData("2"),
+                        new BinaryStringData("12"));
     }
 }

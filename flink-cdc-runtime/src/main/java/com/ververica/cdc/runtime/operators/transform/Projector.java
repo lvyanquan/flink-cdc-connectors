@@ -16,6 +16,17 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
+import com.ververica.cdc.common.data.DecimalData;
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
+import com.ververica.cdc.common.event.CreateTableEvent;
+import com.ververica.cdc.common.event.SchemaChangeEvent;
+import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.schema.Schema;
+import com.ververica.cdc.common.types.DataType;
+import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.runtime.parser.FlinkSqlParser;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.MapContext;
@@ -27,23 +38,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.ververica.cdc.common.data.DecimalData;
-import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.data.binary.BinaryStringData;
-import com.ververica.cdc.common.event.CreateTableEvent;
-import com.ververica.cdc.common.event.SchemaChangeEvent;
-import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.common.types.DataField;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.types.RowType;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-
-/**
- * Projector
- */
+/** The Projector applies to describe the projection of filtering tables. */
 public class Projector {
     private String projection;
     private final int includeAllSourceColumnIndex;
@@ -51,7 +46,11 @@ public class Projector {
 
     private BinaryRecordDataGenerator recordDataGenerator;
 
-    public Projector(String projection, int includeAllSourceColumnIndex, List<ColumnTransform> columnTransformList, BinaryRecordDataGenerator recordDataGenerator) {
+    public Projector(
+            String projection,
+            int includeAllSourceColumnIndex,
+            List<ColumnTransform> columnTransformList,
+            BinaryRecordDataGenerator recordDataGenerator) {
         this.projection = projection;
         this.includeAllSourceColumnIndex = includeAllSourceColumnIndex;
         this.columnTransformList = columnTransformList;
@@ -66,52 +65,71 @@ public class Projector {
         return recordDataGenerator;
     }
 
-    private static Projector of(String projection, int includeAllSourceColumnIndex, List<ColumnTransform> columnTransformList, BinaryRecordDataGenerator recordDataGenerator) {
-        return new Projector(projection, includeAllSourceColumnIndex, columnTransformList, recordDataGenerator);
+    private static Projector of(
+            String projection,
+            int includeAllSourceColumnIndex,
+            List<ColumnTransform> columnTransformList,
+            BinaryRecordDataGenerator recordDataGenerator) {
+        return new Projector(
+                projection, includeAllSourceColumnIndex, columnTransformList, recordDataGenerator);
     }
 
-    private static RowType toRowType(List<ColumnTransform> columnTransformList){
-        DataType[] dataTypes = columnTransformList.stream().map(ColumnTransform::getDataType).toArray(DataType[]::new);
-        String[] columnNames = columnTransformList.stream().map(ColumnTransform::getColumnName).toArray(String[]::new);
+    private static RowType toRowType(List<ColumnTransform> columnTransformList) {
+        DataType[] dataTypes =
+                columnTransformList.stream()
+                        .map(ColumnTransform::getDataType)
+                        .toArray(DataType[]::new);
+        String[] columnNames =
+                columnTransformList.stream()
+                        .map(ColumnTransform::getColumnName)
+                        .toArray(String[]::new);
         return RowType.of(dataTypes, columnNames);
     }
 
-    private static List<Column> toColumnList(List<ColumnTransform> columnTransformList){
-        return columnTransformList.stream().map(columnTransform -> {
-            return Column.physicalColumn(columnTransform.getColumnName(), columnTransform.getDataType());
-        }).collect(Collectors.toList());
+    private static List<Column> toColumnList(List<ColumnTransform> columnTransformList) {
+        return columnTransformList.stream()
+                .map(
+                        columnTransform -> {
+                            return Column.physicalColumn(
+                                    columnTransform.getColumnName(), columnTransform.getDataType());
+                        })
+                .collect(Collectors.toList());
     }
 
     public static Projector generateProjector(String projection) {
         SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
-        List<ColumnTransform> columnTransformList = FlinkSqlParser.generateColumnTransforms(sqlSelect.getSelectList());
+        List<ColumnTransform> columnTransformList =
+                FlinkSqlParser.generateColumnTransforms(sqlSelect.getSelectList());
         int includeAllSourceColumnIndex = -1;
         // convert columnTransform named `*` into the flag of includeAllSourceColumn
-        for(int i=0;i< columnTransformList.size();i++){
+        for (int i = 0; i < columnTransformList.size(); i++) {
             // the column name of star is ""
-            if(columnTransformList.get(i).getColumnName().equals("")){
+            if (columnTransformList.get(i).getColumnName().equals("")) {
                 includeAllSourceColumnIndex = i;
                 columnTransformList.remove(i);
                 break;
             }
         }
-        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(toRowType(columnTransformList));
         return of(projection, includeAllSourceColumnIndex, columnTransformList, generator);
     }
 
-    private boolean includeAllSourceColumn(){
+    private boolean includeAllSourceColumn() {
         return includeAllSourceColumnIndex > -1;
     }
 
     public SchemaChangeEvent applyProjector(SchemaChangeEvent schemaChangeEvent) {
-        if(schemaChangeEvent instanceof CreateTableEvent){
+        if (schemaChangeEvent instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
             List<Column> sourceColumns = createTableEvent.getSchema().getColumns();
             List<ColumnTransform> sourceColumnTransform = new ArrayList<>();
-            sourceColumns.forEach(sourceColumn->{
-                sourceColumnTransform.add(ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
-            });
-            if(includeAllSourceColumn()){
+            sourceColumns.forEach(
+                    sourceColumn -> {
+                        sourceColumnTransform.add(
+                                ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
+                    });
+            if (includeAllSourceColumn()) {
                 columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
             }
             recordDataGenerator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
@@ -127,25 +145,35 @@ public class Projector {
         Map<String, Object> originalValueMap = new ConcurrentHashMap<>();
         JexlContext jexlContext = new MapContext();
         for (int i = 0; i < columns.size(); i++) {
-            originalValueMap.put(columns.get(i).getName(), fromDataType(after.getString(i), columns.get(i).getType()));
-            jexlContext.set(columns.get(i).getName(), fromDataType(after.getString(i), columns.get(i).getType()));
+            originalValueMap.put(
+                    columns.get(i).getName(),
+                    fromDataType(after.getString(i), columns.get(i).getType()));
+            jexlContext.set(
+                    columns.get(i).getName(),
+                    fromDataType(after.getString(i), columns.get(i).getType()));
         }
 
         for (ColumnTransform columnTransform : columnTransformList) {
             if (originalValueMap.containsKey(columnTransform.getColumnName())) {
-                valueList.add(toDataType(originalValueMap.get(columnTransform.getColumnName()).toString(), columnTransform.getDataType()));
+                valueList.add(
+                        toDataType(
+                                originalValueMap.get(columnTransform.getColumnName()).toString(),
+                                columnTransform.getDataType()));
             } else {
-                valueList.add(toDataType(columnTransform.evaluate(jexlContext), columnTransform.getDataType()));
+                valueList.add(
+                        toDataType(
+                                columnTransform.evaluate(jexlContext),
+                                columnTransform.getDataType()));
             }
         }
         return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
     }
 
-    private Object fromDataType(Object value, DataType dataType){
-        if(value == null){
+    private Object fromDataType(Object value, DataType dataType) {
+        if (value == null) {
             return value;
         }
-        switch (dataType.getTypeRoot()){
+        switch (dataType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
                 return value.toString();
@@ -167,17 +195,18 @@ public class Projector {
         }
     }
 
-    private Object toDataType(Object value, DataType dataType){
-        if(value == null){
+    private Object toDataType(Object value, DataType dataType) {
+        if (value == null) {
             return BinaryStringData.fromString("");
         }
-        switch (dataType.getTypeRoot()){
+        switch (dataType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
                 return BinaryStringData.fromString(value.toString());
             case DECIMAL:
                 BigDecimal bigDecimalValue = (BigDecimal) value;
-                return DecimalData.fromBigDecimal(bigDecimalValue, bigDecimalValue.precision(), bigDecimalValue.scale());
+                return DecimalData.fromBigDecimal(
+                        bigDecimalValue, bigDecimalValue.precision(), bigDecimalValue.scale());
             default:
                 return BinaryStringData.fromString(value.toString());
         }

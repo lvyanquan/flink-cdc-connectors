@@ -16,11 +16,7 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
-
 import org.apache.flink.configuration.Configuration;
-
-import org.junit.jupiter.api.Test;
 
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -30,10 +26,11 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.junit.jupiter.api.Test;
 
-/**
- * FilterFunctionTest
- */
+import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
+
+/** Unit tests for the {@link FilterFunction}. */
 public class FilterFunctionTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -45,48 +42,60 @@ public class FilterFunctionTest {
                     .build();
     private static final Schema EXPECT_SCHEMA =
             Schema.newBuilder()
-                .physicalColumn("col1", DataTypes.STRING())
-                .physicalColumn("col2", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col2", DataTypes.STRING())
                     .primaryKey("id")
                     .build();
 
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
         FilterFunction transform =
-            FilterFunction.newBuilder().addFilter(CUSTOMERS_TABLEID.identifier(),"col1, col2","col1 < 2").build();
+                FilterFunction.newBuilder()
+                        .addFilter(CUSTOMERS_TABLEID.identifier(), "col1, col2", "col1 < 2")
+                        .build();
         transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
-            new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
         // The create table will be used to build metadata
-        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
         // The insert event will be filtered
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
                         CUSTOMERS_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}));
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("1")
+                                }));
         // The insert event will be discarded
         DataChangeEvent insertEventDiscarded =
-            DataChangeEvent.insertEvent(
-                CUSTOMERS_TABLEID,
-                recordDataGenerator.generate(
-                    new Object[] {new BinaryStringData("2"), new BinaryStringData("2")}));
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"), new BinaryStringData("2")
+                                }));
         // The update event will be filtered
         DataChangeEvent updateEvent =
-            DataChangeEvent.updateEvent(
-                CUSTOMERS_TABLEID,
-                recordDataGenerator.generate(
-                    new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}),
-                recordDataGenerator.generate(
-                    new Object[] {new BinaryStringData("1"), new BinaryStringData("2")})
-            );
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("1")
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2")
+                                }));
 
         // The delete event will be skipped
         DataChangeEvent deleteEvent =
-            DataChangeEvent.deleteEvent(
-                CUSTOMERS_TABLEID,
-                recordDataGenerator.generate(
-                    new Object[] {new BinaryStringData("2"), new BinaryStringData("2")}));
+                DataChangeEvent.deleteEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"), new BinaryStringData("2")
+                                }));
 
         assertThat(transform.filter(createTableEvent)).isTrue();
         assertThat(transform.filter(insertEvent)).isTrue();

@@ -17,19 +17,19 @@
 package com.ververica.cdc.runtime.parser;
 
 import org.apache.calcite.sql.SqlSelect;
-
 import org.junit.Assert;
 import org.junit.Test;
 
-/**
- * FlinkSqlParserTest
- */
+/** Unit tests for the {@link FlinkSqlParser}. */
 public class FlinkSqlParserTest {
 
     @Test
-    public void parserTest(){
-        SqlSelect parse = FlinkSqlParser.parseSelect("select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10");
-        Assert.assertEquals("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
+    public void parserTest() {
+        SqlSelect parse =
+                FlinkSqlParser.parseSelect(
+                        "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10");
+        Assert.assertEquals(
+                "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
         Assert.assertEquals("`uniq_id` > 10", parse.getWhere().toString());
     }
 }

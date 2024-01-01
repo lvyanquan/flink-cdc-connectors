@@ -16,6 +16,10 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.types.DataType;
+import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.JexlExpression;
@@ -26,18 +30,12 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
-import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-
-/**
- * RowFilter
- */
+/** The RowFilter applies to describe the row filter of filtering tables. */
 public class RowFilter {
     private final Set<String> columnNames;
     private final JexlExpression expression;
     private static final Engine jexlEngine = new Engine();
+
     public RowFilter(Set<String> columnNames, JexlExpression expression) {
         this.columnNames = columnNames;
         this.expression = expression;
@@ -65,16 +63,18 @@ public class RowFilter {
     public boolean run(BinaryRecordData after, List<Column> columns) {
         JexlContext jexlContext = new MapContext();
         for (int i = 0; i < columns.size(); i++) {
-            jexlContext.set(columns.get(i).getName(), fromDataType(after.getString(i), columns.get(i).getType()));
+            jexlContext.set(
+                    columns.get(i).getName(),
+                    fromDataType(after.getString(i), columns.get(i).getType()));
         }
         return (Boolean) expression.evaluate(jexlContext);
     }
 
-    private Object fromDataType(Object value, DataType dataType){
-        if(value == null){
+    private Object fromDataType(Object value, DataType dataType) {
+        if (value == null) {
             return value;
         }
-        switch (dataType.getTypeRoot()){
+        switch (dataType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
                 return value.toString();

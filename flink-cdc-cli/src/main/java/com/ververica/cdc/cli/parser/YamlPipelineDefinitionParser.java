@@ -55,6 +55,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
 
+    // Transform keys
     private static final String TRANSFORM_SOURCE_TABLE_KEY = "source-table";
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
     private static final String TRANSFORM_FILTER_KEY = "filter";
@@ -87,7 +88,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
         Optional.ofNullable(root.get(TRANSFORM_KEY))
-                .ifPresent(node -> node.forEach(transform -> transformDefs.add(toTransformDef(transform))));
+                .ifPresent(
+                        node ->
+                                node.forEach(
+                                        transform -> transformDefs.add(toTransformDef(transform))));
 
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
@@ -161,25 +165,25 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private TransformDef toTransformDef(JsonNode transformNode) {
         String sourceTable =
-            checkNotNull(
-                transformNode.get(TRANSFORM_SOURCE_TABLE_KEY),
-                "Missing required field \"%s\" in transform configuration",
-                TRANSFORM_SOURCE_TABLE_KEY)
-                .asText();
+                checkNotNull(
+                                transformNode.get(TRANSFORM_SOURCE_TABLE_KEY),
+                                "Missing required field \"%s\" in transform configuration",
+                                TRANSFORM_SOURCE_TABLE_KEY)
+                        .asText();
         String projection =
-            checkNotNull(
-                transformNode.get(TRANSFORM_PROJECTION_KEY),
-                "Missing required field \"%s\" in transform configuration",
-                TRANSFORM_PROJECTION_KEY)
-                .asText();
+                checkNotNull(
+                                transformNode.get(TRANSFORM_PROJECTION_KEY),
+                                "Missing required field \"%s\" in transform configuration",
+                                TRANSFORM_PROJECTION_KEY)
+                        .asText();
         String filter =
-            Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
-                .map(JsonNode::asText)
-                .orElse(null);
+                Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
         String description =
-            Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
-                .map(JsonNode::asText)
-                .orElse(null);
+                Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
         return new TransformDef(sourceTable, projection, filter, description);
     }
 

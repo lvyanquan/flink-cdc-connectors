@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.ververica.cdc.composer.flink.translator;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
-
-import java.util.List;
 
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
@@ -25,9 +24,9 @@ import com.ververica.cdc.runtime.operators.transform.FilterFunction;
 import com.ververica.cdc.runtime.operators.transform.ProjectionFunction;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
-/**
- * TransformTranslator
- */
+import java.util.List;
+
+/** Translator for transform. */
 public class TransformTranslator {
 
     public DataStream<Event> translate(DataStream<Event> input, List<TransformDef> transforms) {
@@ -39,11 +38,15 @@ public class TransformTranslator {
         FilterFunction.Builder filterFunctionBuilder = FilterFunction.newBuilder();
         for (TransformDef transform : transforms) {
             projectionFunctionBuilder.addProjection(
-                transform.getSourceTable(), transform.getProjection());
+                    transform.getSourceTable(), transform.getProjection());
             filterFunctionBuilder.addFilter(
-                transform.getSourceTable(), transform.getProjection(), transform.getFilter().get());
+                    transform.getSourceTable(),
+                    transform.getProjection(),
+                    transform.getFilter().get());
         }
-        DataStream<Event> projectionOutput = input.map(projectionFunctionBuilder.build(), new EventTypeInfo()).name("Transform:Projection");
+        DataStream<Event> projectionOutput =
+                input.map(projectionFunctionBuilder.build(), new EventTypeInfo())
+                        .name("Transform:Projection");
         return projectionOutput.filter(filterFunctionBuilder.build()).name("Transform:Filter");
     }
 }
