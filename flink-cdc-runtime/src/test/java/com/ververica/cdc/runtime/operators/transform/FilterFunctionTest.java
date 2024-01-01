@@ -52,26 +52,46 @@ public class FilterFunctionTest {
 
     @Test
     void testDataChangeEventTransformProjection() throws Exception {
-        // Create table
-        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
         FilterFunction transform =
             FilterFunction.newBuilder().addFilter(CUSTOMERS_TABLEID.identifier(),"col1, col2","col1 < 2").build();
-                transform.open(new Configuration());
-        transform.filter(createTableEvent);
+        transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
-        // Insert
+            new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+        // The create table will be used to build metadata
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+        // The insert event will be filtered
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
                         CUSTOMERS_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}));
-        DataChangeEvent insertEvent2 =
+        // The insert event will be discarded
+        DataChangeEvent insertEventDiscarded =
             DataChangeEvent.insertEvent(
                 CUSTOMERS_TABLEID,
                 recordDataGenerator.generate(
                     new Object[] {new BinaryStringData("2"), new BinaryStringData("2")}));
+        // The update event will be filtered
+        DataChangeEvent updateEvent =
+            DataChangeEvent.updateEvent(
+                CUSTOMERS_TABLEID,
+                recordDataGenerator.generate(
+                    new Object[] {new BinaryStringData("1"), new BinaryStringData("1")}),
+                recordDataGenerator.generate(
+                    new Object[] {new BinaryStringData("1"), new BinaryStringData("2")})
+            );
+
+        // The delete event will be skipped
+        DataChangeEvent deleteEvent =
+            DataChangeEvent.deleteEvent(
+                CUSTOMERS_TABLEID,
+                recordDataGenerator.generate(
+                    new Object[] {new BinaryStringData("2"), new BinaryStringData("2")}));
+
+        assertThat(transform.filter(createTableEvent)).isTrue();
         assertThat(transform.filter(insertEvent)).isTrue();
-        assertThat(transform.filter(insertEvent2)).isFalse();
+        assertThat(transform.filter(insertEventDiscarded)).isFalse();
+        assertThat(transform.filter(updateEvent)).isTrue();
+        assertThat(transform.filter(deleteEvent)).isTrue();
     }
 }
