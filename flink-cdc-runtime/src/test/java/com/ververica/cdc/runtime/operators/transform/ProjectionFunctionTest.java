@@ -24,6 +24,7 @@ import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.OperationType;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
+import com.ververica.cdc.common.testutils.assertions.DataChangeEventAssert;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -52,7 +53,7 @@ public class ProjectionFunctionTest {
                     .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
-                    .primaryKey("id")
+                    .primaryKey("col1")
                     .build();
 
     @Test
@@ -65,7 +66,6 @@ public class ProjectionFunctionTest {
                         .addProjection(CUSTOMERS_TABLEID.identifier(), "*, col1 + col2 col12")
                         .build();
         transform.open(new Configuration());
-        transform.map(createTableEvent);
 
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SOURCE_SCHEMA.toRowDataType()));
@@ -78,6 +78,23 @@ public class ProjectionFunctionTest {
                                 new Object[] {
                                     new BinaryStringData("1"), new BinaryStringData("2")
                                 }));
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2")
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("3")
+                                }));
+        assertThat(transform.map(createTableEvent))
+                .asSchemaChangeEvent()
+                .asCreateTableEvent()
+                .hasTableId(CUSTOMERS_TABLEID)
+                .hasSchema(EXPECT_SCHEMA);
         assertThat(transform.map(insertEvent))
                 .asDataChangeEvent()
                 .hasTableId(CUSTOMERS_TABLEID)
@@ -89,5 +106,26 @@ public class ProjectionFunctionTest {
                         new BinaryStringData("1"),
                         new BinaryStringData("2"),
                         new BinaryStringData("12"));
+        DataChangeEventAssert updateEventAssert =
+                assertThat(transform.map(updateEvent))
+                        .asDataChangeEvent()
+                        .hasTableId(CUSTOMERS_TABLEID)
+                        .hasOperationType(OperationType.UPDATE);
+        updateEventAssert
+                .withBeforeRecordData()
+                .hasArity(3)
+                .withSchema(EXPECT_SCHEMA)
+                .hasFields(
+                        new BinaryStringData("1"),
+                        new BinaryStringData("2"),
+                        new BinaryStringData("12"));
+        updateEventAssert
+                .withAfterRecordData()
+                .hasArity(3)
+                .withSchema(EXPECT_SCHEMA)
+                .hasFields(
+                        new BinaryStringData("1"),
+                        new BinaryStringData("3"),
+                        new BinaryStringData("13"));
     }
 }

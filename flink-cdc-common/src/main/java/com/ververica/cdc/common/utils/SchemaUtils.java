@@ -47,6 +47,18 @@ public class SchemaUtils {
         return fieldGetters;
     }
 
+    /**
+     * create a list of {@link RecordData.FieldGetter} from given {@link Column} to get Object from
+     * RecordData.
+     */
+    public static List<RecordData.FieldGetter> createFieldGetters(List<Column> columns) {
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+            fieldGetters.add(RecordData.createFieldGetter(columns.get(i).getType(), i));
+        }
+        return fieldGetters;
+    }
+
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
         if (event instanceof AddColumnEvent) {

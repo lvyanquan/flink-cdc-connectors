@@ -19,11 +19,7 @@ package com.ververica.cdc.composer.definition;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Definition of transformation.
- *
- * <p>Transformation will be implemented later, therefore we left the class blank.
- */
+/** Definition of transformation. */
 public class TransformDef {
     private final String sourceTable;
     private final String projection;

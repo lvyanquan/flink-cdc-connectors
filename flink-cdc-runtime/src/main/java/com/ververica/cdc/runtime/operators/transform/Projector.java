@@ -17,6 +17,7 @@
 package com.ververica.cdc.runtime.operators.transform;
 
 import com.ververica.cdc.common.data.DecimalData;
+import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -25,6 +26,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.calcite.sql.SqlSelect;
@@ -144,13 +146,11 @@ public class Projector {
         List<Object> valueList = new ArrayList<>();
         Map<String, Object> originalValueMap = new ConcurrentHashMap<>();
         JexlContext jexlContext = new MapContext();
+        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
         for (int i = 0; i < columns.size(); i++) {
             originalValueMap.put(
-                    columns.get(i).getName(),
-                    fromDataType(after.getString(i), columns.get(i).getType()));
-            jexlContext.set(
-                    columns.get(i).getName(),
-                    fromDataType(after.getString(i), columns.get(i).getType()));
+                    columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
+            jexlContext.set(columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
         }
 
         for (ColumnTransform columnTransform : columnTransformList) {
@@ -169,36 +169,11 @@ public class Projector {
         return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
     }
 
-    private Object fromDataType(Object value, DataType dataType) {
-        if (value == null) {
-            return value;
-        }
-        switch (dataType.getTypeRoot()) {
-            case CHAR:
-            case VARCHAR:
-                return value.toString();
-            case DECIMAL:
-                return BigDecimal.valueOf((long) value);
-            case TINYINT:
-            case SMALLINT:
-            case INTEGER:
-            case BIGINT:
-                return Integer.parseInt(value.toString());
-            case FLOAT:
-                return Float.parseFloat(value.toString());
-            case DOUBLE:
-                return Double.parseDouble(value.toString());
-            case BOOLEAN:
-                return Boolean.parseBoolean(value.toString());
-            default:
-                return value;
-        }
-    }
-
     private Object toDataType(Object value, DataType dataType) {
         if (value == null) {
             return BinaryStringData.fromString("");
         }
+        // todo: Improve column type conversion
         switch (dataType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:

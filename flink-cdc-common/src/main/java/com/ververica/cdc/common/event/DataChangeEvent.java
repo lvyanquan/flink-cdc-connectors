@@ -139,6 +139,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     }
 
     /**
+     * Updates the before of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent setBefore(DataChangeEvent dataChangeEvent, RecordData before) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                before,
+                dataChangeEvent.after,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
+    /**
      * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */

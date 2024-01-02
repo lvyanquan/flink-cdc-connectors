@@ -40,9 +40,7 @@ public class TransformTranslator {
             projectionFunctionBuilder.addProjection(
                     transform.getSourceTable(), transform.getProjection());
             filterFunctionBuilder.addFilter(
-                    transform.getSourceTable(),
-                    transform.getProjection(),
-                    transform.getFilter().get());
+                    transform.getSourceTable(), transform.getFilter().get());
         }
         DataStream<Event> projectionOutput =
                 input.map(projectionFunctionBuilder.build(), new EventTypeInfo())

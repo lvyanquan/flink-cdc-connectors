@@ -51,7 +51,7 @@ public class FilterFunctionTest {
     void testDataChangeEventTransformProjection() throws Exception {
         FilterFunction transform =
                 FilterFunction.newBuilder()
-                        .addFilter(CUSTOMERS_TABLEID.identifier(), "col1, col2", "col1 < 2")
+                        .addFilter(CUSTOMERS_TABLEID.identifier(), "col1 < 2")
                         .build();
         transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =

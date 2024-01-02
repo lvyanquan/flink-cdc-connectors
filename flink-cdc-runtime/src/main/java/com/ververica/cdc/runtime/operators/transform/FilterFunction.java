@@ -18,7 +18,6 @@ package com.ververica.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
@@ -30,8 +29,6 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +36,7 @@ import java.util.stream.Collectors;
 
 /** A map function that applies user-defined transform logics. */
 public class FilterFunction extends RichFilterFunction<Event> {
-    private final List<Tuple3<String, String, String>> filterRules;
+    private final List<Tuple2<String, String>> filterRules;
     private transient List<Tuple2<Selectors, RowFilter>> filters;
     private final Map<TableId, List<Column>> columnMap;
 
@@ -49,10 +46,10 @@ public class FilterFunction extends RichFilterFunction<Event> {
 
     /** Builder of {@link FilterFunction}. */
     public static class Builder {
-        private final List<Tuple3<String, String, String>> filterRules = new ArrayList<>();
+        private final List<Tuple2<String, String>> filterRules = new ArrayList<>();
 
-        public Builder addFilter(String tableInclusions, String projection, String filter) {
-            filterRules.add(Tuple3.of(tableInclusions, projection, filter));
+        public Builder addFilter(String tableInclusions, String filter) {
+            filterRules.add(Tuple2.of(tableInclusions, filter));
             return this;
         }
 
@@ -61,7 +58,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
         }
     }
 
-    private FilterFunction(List<Tuple3<String, String, String>> filterRules) {
+    private FilterFunction(List<Tuple2<String, String>> filterRules) {
         this.filterRules = filterRules;
         this.columnMap = new ConcurrentHashMap<>();
     }
@@ -71,9 +68,9 @@ public class FilterFunction extends RichFilterFunction<Event> {
         filters =
                 filterRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.f0;
-                                    String filterExpression = tuple3.f2;
+                                tuple2 -> {
+                                    String tableInclusions = tuple2.f0;
+                                    String filterExpression = tuple2.f1;
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
                                                     .includeTables(tableInclusions)
@@ -88,7 +85,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
     @Override
     public boolean filter(Event event) throws Exception {
         if (event instanceof CreateTableEvent) {
-            transformCreateTableEvent((CreateTableEvent) event);
+            catchSchema((CreateTableEvent) event);
             return true;
         }
         if (!(event instanceof DataChangeEvent)) {
@@ -113,12 +110,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
         return true;
     }
 
-    private void transformCreateTableEvent(CreateTableEvent createTableEvent) {
-        List<Column> sourceColumn =
-                new ArrayList<>(
-                        Arrays.asList(
-                                new Column[createTableEvent.getSchema().getColumns().size()]));
-        Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
-        columnMap.put(createTableEvent.tableId(), sourceColumn);
+    private void catchSchema(CreateTableEvent createTableEvent) {
+        columnMap.put(createTableEvent.tableId(), createTableEvent.getSchema().getColumns());
     }
 }

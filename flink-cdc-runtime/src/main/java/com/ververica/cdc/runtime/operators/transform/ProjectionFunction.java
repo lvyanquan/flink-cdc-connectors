@@ -30,8 +30,6 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Selectors;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,20 +92,25 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
             return event;
         }
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        // skip delete event
-        if (after == null) {
-            return event;
-        }
         TableId tableId = dataChangeEvent.tableId();
 
         for (Tuple2<Selectors, Projector> route : projection) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
-                BinaryRecordData data =
-                        projector.generateRecordData(after, sourceColumnMap.get(tableId));
-                return DataChangeEvent.setAfter(dataChangeEvent, data);
+                BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
+                if (before != null) {
+                    BinaryRecordData data =
+                            projector.generateRecordData(before, sourceColumnMap.get(tableId));
+                    dataChangeEvent = DataChangeEvent.setBefore(dataChangeEvent, data);
+                }
+                BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+                if (after != null) {
+                    BinaryRecordData data =
+                            projector.generateRecordData(after, sourceColumnMap.get(tableId));
+                    dataChangeEvent = DataChangeEvent.setAfter(dataChangeEvent, data);
+                }
+                return dataChangeEvent;
             }
         }
 
@@ -115,12 +118,7 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
     }
 
     private SchemaChangeEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
-        List<Column> sourceColumn =
-                new ArrayList<>(
-                        Arrays.asList(
-                                new Column[createTableEvent.getSchema().getColumns().size()]));
-        Collections.copy(sourceColumn, createTableEvent.getSchema().getColumns());
-        sourceColumnMap.put(createTableEvent.tableId(), sourceColumn);
+        sourceColumnMap.put(createTableEvent.tableId(), createTableEvent.getSchema().getColumns());
         TableId tableId = createTableEvent.tableId();
         for (Tuple2<Selectors, Projector> route : projection) {
             Selectors selectors = route.f0;
