@@ -16,10 +16,8 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import com.ververica.cdc.common.data.DecimalData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
-import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.schema.Column;
@@ -29,11 +27,11 @@ import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.MapContext;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +43,6 @@ public class Projector {
     private String projection;
     private final int includeAllSourceColumnIndex;
     private final List<ColumnTransform> columnTransformList;
-
     private BinaryRecordDataGenerator recordDataGenerator;
 
     public Projector(
@@ -156,34 +153,16 @@ public class Projector {
         for (ColumnTransform columnTransform : columnTransformList) {
             if (originalValueMap.containsKey(columnTransform.getColumnName())) {
                 valueList.add(
-                        toDataType(
-                                originalValueMap.get(columnTransform.getColumnName()).toString(),
+                        DataTypeConverter.convert(
+                                originalValueMap.get(columnTransform.getColumnName()),
                                 columnTransform.getDataType()));
             } else {
                 valueList.add(
-                        toDataType(
+                        DataTypeConverter.convert(
                                 columnTransform.evaluate(jexlContext),
                                 columnTransform.getDataType()));
             }
         }
         return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
-    }
-
-    private Object toDataType(Object value, DataType dataType) {
-        if (value == null) {
-            return BinaryStringData.fromString("");
-        }
-        // todo: Improve column type conversion
-        switch (dataType.getTypeRoot()) {
-            case CHAR:
-            case VARCHAR:
-                return BinaryStringData.fromString(value.toString());
-            case DECIMAL:
-                BigDecimal bigDecimalValue = (BigDecimal) value;
-                return DecimalData.fromBigDecimal(
-                        bigDecimalValue, bigDecimalValue.precision(), bigDecimalValue.scale());
-            default:
-                return BinaryStringData.fromString(value.toString());
-        }
     }
 }

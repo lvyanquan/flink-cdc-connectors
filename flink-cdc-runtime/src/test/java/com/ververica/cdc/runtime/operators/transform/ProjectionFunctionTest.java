@@ -18,6 +18,8 @@ package com.ververica.cdc.runtime.operators.transform;
 
 import org.apache.flink.configuration.Configuration;
 
+import com.ververica.cdc.common.data.DecimalData;
+import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
@@ -29,6 +31,8 @@ import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 
 import static com.ververica.cdc.common.testutils.assertions.EventAssertions.assertThat;
 
@@ -54,6 +58,25 @@ public class ProjectionFunctionTest {
                     .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
                     .primaryKey("col1")
+                    .build();
+
+    private static final TableId DATATYPE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "data_types");
+    private static final Schema DATATYPE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("colString", DataTypes.STRING())
+                    .physicalColumn("colBoolean", DataTypes.BOOLEAN())
+                    .physicalColumn("colTinyint", DataTypes.TINYINT())
+                    .physicalColumn("colSmallint", DataTypes.SMALLINT())
+                    .physicalColumn("colInt", DataTypes.INT())
+                    .physicalColumn("colBigint", DataTypes.BIGINT())
+                    .physicalColumn("colDate", DataTypes.DATE())
+                    .physicalColumn("colTime", DataTypes.TIME())
+                    .physicalColumn("colTimestamp", DataTypes.TIMESTAMP())
+                    .physicalColumn("colFloat", DataTypes.FLOAT())
+                    .physicalColumn("colDouble", DataTypes.DOUBLE())
+                    .physicalColumn("colDecimal", DataTypes.DECIMAL(6, 2))
+                    .primaryKey("colString")
                     .build();
 
     @Test
@@ -127,5 +150,64 @@ public class ProjectionFunctionTest {
                         new BinaryStringData("1"),
                         new BinaryStringData("3"),
                         new BinaryStringData("13"));
+    }
+
+    @Test
+    void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(DATATYPE_TABLEID, DATATYPE_SCHEMA);
+        ProjectionFunction transform =
+                ProjectionFunction.newBuilder()
+                        .addProjection(DATATYPE_TABLEID.identifier(), "*")
+                        .build();
+        transform.open(new Configuration());
+
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) DATATYPE_SCHEMA.toRowDataType()));
+
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        DATATYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("3.14"),
+                                    new Boolean(true),
+                                    new Byte("1"),
+                                    new Short("1"),
+                                    new Integer(1),
+                                    new Long(1),
+                                    new Integer(1704471599),
+                                    new Integer(1704471599),
+                                    TimestampData.fromMillis(1704471599),
+                                    new Float(3.14f),
+                                    new Double(3.14d),
+                                    DecimalData.fromBigDecimal(new BigDecimal(3.14), 6, 2),
+                                }));
+        assertThat(transform.map(createTableEvent))
+                .asSchemaChangeEvent()
+                .asCreateTableEvent()
+                .hasTableId(DATATYPE_TABLEID)
+                .hasSchema(DATATYPE_SCHEMA);
+        assertThat(transform.map(insertEvent))
+                .asDataChangeEvent()
+                .hasTableId(DATATYPE_TABLEID)
+                .hasOperationType(OperationType.INSERT)
+                .withAfterRecordData()
+                .hasArity(12)
+                .withSchema(DATATYPE_SCHEMA)
+                .hasFields(
+                        new BinaryStringData("3.14"),
+                        new Boolean(true),
+                        new Byte("1"),
+                        new Short("1"),
+                        new Integer(1),
+                        new Long(1),
+                        new Integer(1704471599),
+                        new Integer(1704471599),
+                        TimestampData.fromMillis(1704471599),
+                        new Float(3.14f),
+                        new Double(3.14d),
+                        DecimalData.fromBigDecimal(new BigDecimal(3.14), 6, 2));
     }
 }
