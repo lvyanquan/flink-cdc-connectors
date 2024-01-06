@@ -28,7 +28,6 @@ import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
-import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.MapContext;
 
@@ -96,9 +95,8 @@ public class Projector {
     }
 
     public static Projector generateProjector(String projection) {
-        SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
         List<ColumnTransform> columnTransformList =
-                FlinkSqlParser.generateColumnTransforms(sqlSelect.getSelectList());
+                FlinkSqlParser.generateColumnTransforms(projection);
         int includeAllSourceColumnIndex = -1;
         // convert columnTransform named `*` into the flag of includeAllSourceColumn
         for (int i = 0; i < columnTransformList.size(); i++) {

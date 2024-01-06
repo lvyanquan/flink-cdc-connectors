@@ -20,7 +20,6 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-import org.apache.calcite.sql.SqlSelect;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.JexlExpression;
 import org.apache.commons.jexl3.MapContext;
@@ -54,8 +53,7 @@ public class RowFilter {
     }
 
     public static RowFilter generateRowFilter(String filterExpression) {
-        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
-        Set<String> columnNames = FlinkSqlParser.generateColumnNames(sqlSelect.getWhere());
+        Set<String> columnNames = FlinkSqlParser.parseColumnNames(filterExpression);
         JexlExpression expression = jexlEngine.createExpression(filterExpression);
         return of(columnNames, expression);
     }

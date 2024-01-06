@@ -80,20 +80,28 @@ public class FlinkSqlParser {
         }
     }
 
-    public static List<ColumnTransform> generateColumnTransforms(List<SqlNode> selectList) {
+    // Parse all columns
+    public static List<ColumnTransform> generateColumnTransforms(String projection) {
         List<ColumnTransform> columnTransformList = new ArrayList<>();
-        for (SqlNode sqlNode : selectList) {
+        if (StringUtils.isNullOrWhitespaceOnly(projection)) {
+            return columnTransformList;
+        }
+        SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
+        if (sqlSelect.getSelectList().isEmpty()) {
+            return columnTransformList;
+        }
+        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
             if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
                     SqlBasicCall transform = null;
                     String columnName = null;
                     List<SqlNode> operandList = sqlBasicCall.getOperandList();
-                    for (SqlNode sqlNode1 : operandList) {
-                        if (sqlNode1 instanceof SqlBasicCall) {
-                            transform = (SqlBasicCall) sqlNode1;
-                        } else if (sqlNode1 instanceof SqlIdentifier) {
-                            columnName = ((SqlIdentifier) sqlNode1).getSimple();
+                    for (SqlNode operand : operandList) {
+                        if (operand instanceof SqlBasicCall) {
+                            transform = (SqlBasicCall) operand;
+                        } else if (operand instanceof SqlIdentifier) {
+                            columnName = ((SqlIdentifier) operand).getSimple();
                         }
                     }
                     columnTransformList.add(
@@ -112,11 +120,50 @@ public class FlinkSqlParser {
         return columnTransformList;
     }
 
-    public static Set<String> generateColumnNames(SqlNode where) {
+    // Parse computed columns
+    public static Set<String> parseComputedColumnNames(String projection) {
+        Set<String> columnNames = new HashSet<>();
+        if (StringUtils.isNullOrWhitespaceOnly(projection)) {
+            return columnNames;
+        }
+        SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
+        if (sqlSelect.getSelectList().isEmpty()) {
+            return columnNames;
+        }
+        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+            if (sqlNode instanceof SqlBasicCall) {
+                SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+                if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
+                    String columnName = null;
+                    List<SqlNode> operandList = sqlBasicCall.getOperandList();
+                    for (SqlNode operand : operandList) {
+                        if (operand instanceof SqlIdentifier) {
+                            columnName = ((SqlIdentifier) operand).getSimple();
+                        }
+                    }
+                    columnNames.add(columnName);
+                } else {
+                    throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
+                }
+            } else if (sqlNode instanceof SqlIdentifier) {
+                continue;
+            } else {
+                throw new ParseException("Unrecognized projection: " + sqlNode.toString());
+            }
+        }
+        return columnNames;
+    }
+
+    public static Set<String> parseColumnNames(String filterExpression) {
         Set<String> columnNameSet = new HashSet<>();
-        if (where == null) {
+        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return columnNameSet;
         }
+        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
+        if (!sqlSelect.hasWhere()) {
+            return columnNameSet;
+        }
+        SqlNode where = sqlSelect.getWhere();
         if (!(where instanceof SqlBasicCall)) {
             throw new ParseException("Unrecognized where: " + where.toString());
         }

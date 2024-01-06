@@ -85,7 +85,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
     @Override
     public boolean filter(Event event) throws Exception {
         if (event instanceof CreateTableEvent) {
-            catchSchema((CreateTableEvent) event);
+            cacheSchema((CreateTableEvent) event);
             return true;
         }
         if (!(event instanceof DataChangeEvent)) {
@@ -110,7 +110,7 @@ public class FilterFunction extends RichFilterFunction<Event> {
         return true;
     }
 
-    private void catchSchema(CreateTableEvent createTableEvent) {
+    private void cacheSchema(CreateTableEvent createTableEvent) {
         columnMap.put(createTableEvent.tableId(), createTableEvent.getSchema().getColumns());
     }
 }

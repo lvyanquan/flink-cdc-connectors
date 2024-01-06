@@ -40,11 +40,7 @@ public class SchemaUtils {
      * RecordData.
      */
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
-        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(schema.getColumns().size());
-        for (int i = 0; i < schema.getColumns().size(); i++) {
-            fieldGetters.add(RecordData.createFieldGetter(schema.getColumns().get(i).getType(), i));
-        }
-        return fieldGetters;
+        return createFieldGetters(schema.getColumns());
     }
 
     /**

@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.composer.definition;
 
+import com.ververica.cdc.common.utils.StringUtils;
+
 import java.util.Objects;
 import java.util.Optional;
 
@@ -41,8 +43,16 @@ public class TransformDef {
         return projection;
     }
 
+    public boolean isValidProjection() {
+        return !StringUtils.isNullOrWhitespaceOnly(projection);
+    }
+
     public Optional<String> getFilter() {
         return Optional.ofNullable(filter);
+    }
+
+    public boolean isValidFilter() {
+        return !StringUtils.isNullOrWhitespaceOnly(filter);
     }
 
     public Optional<String> getDescription() {

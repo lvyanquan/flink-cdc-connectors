@@ -102,13 +102,13 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
                 if (before != null) {
                     BinaryRecordData data =
                             projector.generateRecordData(before, sourceColumnMap.get(tableId));
-                    dataChangeEvent = DataChangeEvent.setBefore(dataChangeEvent, data);
+                    dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
                 }
                 BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
                 if (after != null) {
                     BinaryRecordData data =
                             projector.generateRecordData(after, sourceColumnMap.get(tableId));
-                    dataChangeEvent = DataChangeEvent.setAfter(dataChangeEvent, data);
+                    dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
                 }
                 return dataChangeEvent;
             }

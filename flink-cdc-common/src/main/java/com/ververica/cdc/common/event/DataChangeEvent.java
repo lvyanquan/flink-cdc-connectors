@@ -142,7 +142,7 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
      * Updates the before of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */
-    public static DataChangeEvent setBefore(DataChangeEvent dataChangeEvent, RecordData before) {
+    public static DataChangeEvent resetBefore(DataChangeEvent dataChangeEvent, RecordData before) {
         return new DataChangeEvent(
                 dataChangeEvent.tableId,
                 before,
@@ -155,7 +155,7 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
      * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */
-    public static DataChangeEvent setAfter(DataChangeEvent dataChangeEvent, RecordData after) {
+    public static DataChangeEvent resetAfter(DataChangeEvent dataChangeEvent, RecordData after) {
         return new DataChangeEvent(
                 dataChangeEvent.tableId,
                 dataChangeEvent.before,

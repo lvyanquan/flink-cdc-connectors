@@ -543,44 +543,44 @@ public class ValuesDataSourceHelper {
         split1.add(addColumnEvent);
 
         // rename column
-        /*Map<String, String> nameMapping = new HashMap<>();
+        Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newCol2");
         nameMapping.put("col3", "newCol3");
         RenameColumnEvent renameColumnEvent = new RenameColumnEvent(TABLE_1, nameMapping);
-        split1.add(renameColumnEvent);*/
+        split1.add(renameColumnEvent);
 
         // drop column
-        /*DropColumnEvent dropColumnEvent =
-            new DropColumnEvent(
-                TABLE_1,
-                Collections.singletonList(
-                    Column.physicalColumn("newCol2", DataTypes.STRING())));
-        split1.add(dropColumnEvent);*/
+        DropColumnEvent dropColumnEvent =
+                new DropColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                Column.physicalColumn("newCol2", DataTypes.STRING())));
+        split1.add(dropColumnEvent);
 
         // delete
-        /*split1.add(
-        DataChangeEvent.deleteEvent(
-            TABLE_1,
-            generator.generate(
-                new Object[] {
-                    BinaryStringData.fromString("1"),
-                    BinaryStringData.fromString("1")
-                })));*/
+        split1.add(
+                DataChangeEvent.deleteEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                })));
 
         // update
-        /*split1.add(
-        DataChangeEvent.updateEvent(
-            TABLE_1,
-            generator.generate(
-                new Object[] {
-                    BinaryStringData.fromString("2"),
-                    BinaryStringData.fromString("")
-                }),
-            generator.generate(
-                new Object[] {
-                    BinaryStringData.fromString("2"),
-                    BinaryStringData.fromString("x")
-                })));*/
+        split1.add(
+                DataChangeEvent.updateEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("")
+                                }),
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
+                                })));
 
         eventOfSplits.add(split1);
         return eventOfSplits;
