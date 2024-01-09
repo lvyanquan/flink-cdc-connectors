@@ -93,17 +93,17 @@ public class FilterFunction extends RichFilterFunction<Event> {
         }
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         TableId tableId = dataChangeEvent.tableId();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        // delete data event will be skipped
-        if (after == null) {
-            return true;
-        }
-
         for (Tuple2<Selectors, RowFilter> route : filters) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 RowFilter rowFilter = route.f1;
-                return rowFilter.run(after, columnMap.get(tableId));
+                BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+                BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
+                if (after != null) {
+                    return rowFilter.run(after, columnMap.get(tableId));
+                } else if (before != null) {
+                    return rowFilter.run(before, columnMap.get(tableId));
+                }
             }
         }
 

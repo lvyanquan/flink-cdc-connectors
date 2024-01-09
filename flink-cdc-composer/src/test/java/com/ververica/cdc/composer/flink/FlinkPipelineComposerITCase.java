@@ -273,8 +273,8 @@ class FlinkPipelineComposerITCase {
         TransformDef transformDef =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
-                        "*,col1 + col2 as col12",
-                        "col1 < 3",
+                        "*,col1 + col1 as col12",
+                        "col1 < '3'",
                         "");
 
         // Setup pipeline

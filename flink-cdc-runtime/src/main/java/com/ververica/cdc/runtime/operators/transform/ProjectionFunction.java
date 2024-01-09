@@ -26,8 +26,9 @@ import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.schema.Selectors;
+import com.ververica.cdc.common.utils.SchemaUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +40,9 @@ import java.util.stream.Collectors;
 public class ProjectionFunction extends RichMapFunction<Event, Event> {
     private final List<Tuple2<String, String>> projectionRules;
     private transient List<Tuple2<Selectors, Projector>> projection;
-    private final Map<TableId, List<Column>> sourceColumnMap;
+    //    private final Map<TableId, List<Column>> sourceColumnMap;
+    /** keep the relationship of TableId and table information. */
+    private final Map<TableId, TableInfo> tableInfoMap;
 
     public static Builder newBuilder() {
         return new Builder();
@@ -61,7 +64,8 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
 
     private ProjectionFunction(List<Tuple2<String, String>> projectionRules) {
         this.projectionRules = projectionRules;
-        this.sourceColumnMap = new ConcurrentHashMap<>();
+        //        this.sourceColumnMap = new ConcurrentHashMap<>();
+        this.tableInfoMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -85,11 +89,8 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
 
     @Override
     public Event map(Event event) throws Exception {
-        if (event instanceof CreateTableEvent) {
-            return transformCreateTableEvent((CreateTableEvent) event);
-        }
-        if (!(event instanceof DataChangeEvent)) {
-            return event;
+        if (event instanceof SchemaChangeEvent) {
+            return applySchemaChangeEvent((SchemaChangeEvent) event);
         }
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         TableId tableId = dataChangeEvent.tableId();
@@ -100,14 +101,12 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
                 Projector projector = route.f1;
                 BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
                 if (before != null) {
-                    BinaryRecordData data =
-                            projector.generateRecordData(before, sourceColumnMap.get(tableId));
+                    BinaryRecordData data = projector.recordData(before, tableInfoMap.get(tableId));
                     dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
                 }
                 BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
                 if (after != null) {
-                    BinaryRecordData data =
-                            projector.generateRecordData(after, sourceColumnMap.get(tableId));
+                    BinaryRecordData data = projector.recordData(after, tableInfoMap.get(tableId));
                     dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
                 }
                 return dataChangeEvent;
@@ -117,15 +116,32 @@ public class ProjectionFunction extends RichMapFunction<Event, Event> {
         return event;
     }
 
-    private SchemaChangeEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
-        sourceColumnMap.put(createTableEvent.tableId(), createTableEvent.getSchema().getColumns());
+    private SchemaChangeEvent applySchemaChangeEvent(SchemaChangeEvent event) {
+        TableId tableId = event.tableId();
+        Schema newSchema;
+        if (event instanceof CreateTableEvent) {
+            newSchema = ((CreateTableEvent) event).getSchema();
+            event = transformCreateTableEvent((CreateTableEvent) event);
+        } else {
+            TableInfo tableInfo = tableInfoMap.get(tableId);
+            if (tableInfo == null) {
+                throw new RuntimeException("Schema of " + tableId + " is not existed.");
+            }
+            newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
+        }
+        tableInfoMap.put(tableId, TableInfo.of(newSchema));
+        return event;
+    }
+
+    private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
+        tableInfoMap.put(createTableEvent.tableId(), TableInfo.of(createTableEvent.getSchema()));
         TableId tableId = createTableEvent.tableId();
         for (Tuple2<Selectors, Projector> route : projection) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
                 // update the column of projection and add the column of projection into Schema
-                return projector.applyProjector(createTableEvent);
+                return projector.applyCreateTableEvent(createTableEvent);
             }
         }
         return createTableEvent;

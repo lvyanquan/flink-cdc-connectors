@@ -37,7 +37,10 @@ public class ColumnTransform implements Serializable {
         this.dataType = dataType;
         this.transform = transform;
         if (transform != null) {
-            this.expression = jexlEngine.createExpression(transform.toString().replace("`", ""));
+            String transformExpression = transform.toString();
+            // a=b => a==b;
+            transformExpression = transformExpression.replace("`", "").replaceAll("=", "==");
+            this.expression = jexlEngine.createExpression(transformExpression);
         } else {
             this.expression = null;
         }

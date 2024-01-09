@@ -19,12 +19,10 @@ package com.ververica.cdc.runtime.operators.transform;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
-import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.RowType;
-import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
@@ -116,36 +114,32 @@ public class Projector {
         return includeAllSourceColumnIndex > -1;
     }
 
-    public SchemaChangeEvent applyProjector(SchemaChangeEvent schemaChangeEvent) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-            List<Column> sourceColumns = createTableEvent.getSchema().getColumns();
-            List<ColumnTransform> sourceColumnTransform = new ArrayList<>();
-            sourceColumns.forEach(
-                    sourceColumn -> {
-                        sourceColumnTransform.add(
-                                ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
-                    });
-            if (includeAllSourceColumn()) {
-                columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
-            }
-            recordDataGenerator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
-            // add the column of projection into Schema
-            Schema schema = createTableEvent.getSchema().copy(toColumnList(columnTransformList));
-            return new CreateTableEvent(createTableEvent.tableId(), schema);
+    public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
+        List<Column> sourceColumns = createTableEvent.getSchema().getColumns();
+        List<ColumnTransform> sourceColumnTransform = new ArrayList<>();
+        sourceColumns.forEach(
+                sourceColumn -> {
+                    sourceColumnTransform.add(
+                            ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
+                });
+        if (includeAllSourceColumn()) {
+            columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
         }
-        return schemaChangeEvent;
+        recordDataGenerator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
+        // add the column of projection into Schema
+        Schema schema = createTableEvent.getSchema().copy(toColumnList(columnTransformList));
+        return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
-    public BinaryRecordData generateRecordData(BinaryRecordData after, List<Column> columns) {
+    public BinaryRecordData recordData(BinaryRecordData after, TableInfo tableInfo) {
         List<Object> valueList = new ArrayList<>();
         Map<String, Object> originalValueMap = new ConcurrentHashMap<>();
         JexlContext jexlContext = new MapContext();
-        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
         for (int i = 0; i < columns.size(); i++) {
-            originalValueMap.put(
-                    columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
-            jexlContext.set(columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
+            originalValueMap.put(columns.get(i).getName(), fieldGetters[i].getFieldOrNull(after));
+            jexlContext.set(columns.get(i).getName(), fieldGetters[i].getFieldOrNull(after));
         }
 
         for (ColumnTransform columnTransform : columnTransformList) {

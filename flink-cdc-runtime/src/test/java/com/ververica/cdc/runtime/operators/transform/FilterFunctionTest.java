@@ -51,7 +51,7 @@ public class FilterFunctionTest {
     void testDataChangeEventTransformProjection() throws Exception {
         FilterFunction transform =
                 FilterFunction.newBuilder()
-                        .addFilter(CUSTOMERS_TABLEID.identifier(), "col1 < 2")
+                        .addFilter(CUSTOMERS_TABLEID.identifier(), "col1 = '1'")
                         .build();
         transform.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
@@ -101,6 +101,6 @@ public class FilterFunctionTest {
         assertThat(transform.filter(insertEvent)).isTrue();
         assertThat(transform.filter(insertEventDiscarded)).isFalse();
         assertThat(transform.filter(updateEvent)).isTrue();
-        assertThat(transform.filter(deleteEvent)).isTrue();
+        assertThat(transform.filter(deleteEvent)).isFalse();
     }
 }
