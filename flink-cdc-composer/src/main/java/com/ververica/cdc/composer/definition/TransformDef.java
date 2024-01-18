@@ -39,8 +39,8 @@ public class TransformDef {
         return sourceTable;
     }
 
-    public String getProjection() {
-        return projection;
+    public Optional<String> getProjection() {
+        return Optional.ofNullable(projection);
     }
 
     public boolean isValidProjection() {

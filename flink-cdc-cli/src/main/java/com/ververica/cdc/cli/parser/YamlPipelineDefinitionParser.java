@@ -171,11 +171,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 TRANSFORM_SOURCE_TABLE_KEY)
                         .asText();
         String projection =
-                checkNotNull(
-                                transformNode.get(TRANSFORM_PROJECTION_KEY),
-                                "Missing required field \"%s\" in transform configuration",
-                                TRANSFORM_PROJECTION_KEY)
-                        .asText();
+                Optional.ofNullable(transformNode.get(TRANSFORM_PROJECTION_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
         String filter =
                 Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
                         .map(JsonNode::asText)

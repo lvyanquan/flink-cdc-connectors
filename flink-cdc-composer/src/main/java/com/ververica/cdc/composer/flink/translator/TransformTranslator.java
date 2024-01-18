@@ -44,7 +44,7 @@ public class TransformTranslator {
             if (transform.isValidProjection()) {
                 containProjection = true;
                 projectionFunctionBuilder.addProjection(
-                        transform.getSourceTable(), transform.getProjection());
+                        transform.getSourceTable(), transform.getProjection().get());
             }
             if (transform.isValidFilter()) {
                 containFilter = true;
@@ -86,7 +86,7 @@ public class TransformTranslator {
                 continue;
             }
             Set<String> computedColumnNames =
-                    FlinkSqlParser.parseComputedColumnNames(transformDef.getProjection());
+                    FlinkSqlParser.parseComputedColumnNames(transformDef.getProjection().get());
             Set<String> filteredColumnNames =
                     FlinkSqlParser.parseColumnNames(transformDef.getFilter().get());
             for (String computedColumnName : computedColumnNames) {
