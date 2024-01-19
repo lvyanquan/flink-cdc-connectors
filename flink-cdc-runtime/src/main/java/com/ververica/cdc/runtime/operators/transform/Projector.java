@@ -23,6 +23,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
@@ -61,6 +62,11 @@ public class Projector {
         return recordDataGenerator;
     }
 
+    public boolean isVaild() {
+        // includeAllSourceColumnIndex == 0 only has star.
+        return StringUtils.isNullOrWhitespaceOnly(projection) || includeAllSourceColumnIndex == 0;
+    }
+
     private static Projector of(
             String projection,
             int includeAllSourceColumnIndex,
@@ -93,6 +99,9 @@ public class Projector {
     }
 
     public static Projector generateProjector(String projection) {
+        if (StringUtils.isNullOrWhitespaceOnly(projection)) {
+            return null;
+        }
         List<ColumnTransform> columnTransformList =
                 FlinkSqlParser.generateColumnTransforms(projection);
         int includeAllSourceColumnIndex = -1;

@@ -20,13 +20,10 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
-import com.ververica.cdc.runtime.operators.transform.FilterFunction;
-import com.ververica.cdc.runtime.operators.transform.ProjectionFunction;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
+import com.ververica.cdc.runtime.operators.transform.TransformFunction;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
 import java.util.List;
-import java.util.Set;
 
 /** Translator for transform. */
 public class TransformTranslator {
@@ -36,65 +33,15 @@ public class TransformTranslator {
             return input;
         }
 
-        ProjectionFunction.Builder projectionFunctionBuilder = ProjectionFunction.newBuilder();
-        FilterFunction.Builder filterFunctionBuilder = FilterFunction.newBuilder();
-        boolean containProjection = false;
-        boolean containFilter = false;
+        TransformFunction.Builder transformFunctionBuilder = TransformFunction.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection()) {
-                containProjection = true;
-                projectionFunctionBuilder.addProjection(
-                        transform.getSourceTable(), transform.getProjection().get());
-            }
-            if (transform.isValidFilter()) {
-                containFilter = true;
-                filterFunctionBuilder.addFilter(
-                        transform.getSourceTable(), transform.getFilter().get());
+            if (transform.isValidProjection() || transform.isValidFilter()) {
+                transformFunctionBuilder.addTransform(
+                        transform.getSourceTable(),
+                        transform.getProjection().get(),
+                        transform.getFilter().get());
             }
         }
-
-        if (containProjection && !containFilter) {
-            // Only contain projection.
-            return input.map(projectionFunctionBuilder.build(), new EventTypeInfo())
-                    .name("Transform:Projection");
-        } else if (!containProjection && containFilter) {
-            // Only contain filter.
-            return input.filter(filterFunctionBuilder.build()).name("Transform:Filter");
-        } else {
-            // Contain projection and filter.
-            if (containFilteredComputedColumn(transforms)) {
-                DataStream<Event> projectionOutput =
-                        input.map(projectionFunctionBuilder.build(), new EventTypeInfo())
-                                .name("Transform:Projection");
-                return projectionOutput
-                        .filter(filterFunctionBuilder.build())
-                        .name("Transform:Filter");
-            } else {
-                DataStream<Event> filterOutput =
-                        input.filter(filterFunctionBuilder.build()).name("Transform:Filter");
-                return filterOutput
-                        .map(projectionFunctionBuilder.build())
-                        .name("Transform:Projection");
-            }
-        }
-    }
-
-    private boolean containFilteredComputedColumn(List<TransformDef> transforms) {
-        boolean contain = false;
-        for (TransformDef transformDef : transforms) {
-            if (!transformDef.isValidProjection() || !transformDef.isValidProjection()) {
-                continue;
-            }
-            Set<String> computedColumnNames =
-                    FlinkSqlParser.parseComputedColumnNames(transformDef.getProjection().get());
-            Set<String> filteredColumnNames =
-                    FlinkSqlParser.parseColumnNames(transformDef.getFilter().get());
-            for (String computedColumnName : computedColumnNames) {
-                if (filteredColumnNames.contains(computedColumnName)) {
-                    return true;
-                }
-            }
-        }
-        return contain;
+        return input.transform("Transform", new EventTypeInfo(), transformFunctionBuilder.build());
     }
 }

@@ -21,6 +21,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.SchemaUtils;
+import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import org.apache.commons.jexl3.JexlContext;
 import org.apache.commons.jexl3.JexlExpression;
@@ -55,6 +56,9 @@ public class RowFilter {
     }
 
     public static RowFilter generateRowFilter(String filterExpression) {
+        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
+            return null;
+        }
         Set<String> columnNames = FlinkSqlParser.parseColumnNames(filterExpression);
         // a=b => a==b;
         String jexlFilterExpression = filterExpression.replaceAll("=", "==");
@@ -70,6 +74,21 @@ public class RowFilter {
         }
         Object evaluate = expression.evaluate(jexlContext);
         return (Boolean) evaluate;
+    }
+
+    public boolean run(BinaryRecordData after, TableInfo tableInfo) {
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        JexlContext jexlContext = new MapContext();
+        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
+        for (int i = 0; i < columns.size(); i++) {
+            jexlContext.set(columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
+        }
+        Object evaluate = expression.evaluate(jexlContext);
+        return (Boolean) evaluate;
+    }
+
+    public boolean isVaild() {
+        return !columnNames.isEmpty();
     }
 
     private Object fromDataType(Object value, DataType dataType) {
