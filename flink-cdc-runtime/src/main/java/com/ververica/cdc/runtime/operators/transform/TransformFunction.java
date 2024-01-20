@@ -105,7 +105,7 @@ public class TransformFunction extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
         if (event instanceof SchemaChangeEvent) {
-            event = cachedSchemaChangeEvent((SchemaChangeEvent) event);
+            event = cacheLatestSchema((SchemaChangeEvent) event);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {
             Optional<DataChangeEvent> dataChangeEventOptional =
@@ -116,7 +116,7 @@ public class TransformFunction extends AbstractStreamOperator<Event>
         }
     }
 
-    private SchemaChangeEvent cachedSchemaChangeEvent(SchemaChangeEvent event) {
+    private SchemaChangeEvent cacheLatestSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         Schema newSchema;
         if (event instanceof CreateTableEvent) {
@@ -219,7 +219,7 @@ public class TransformFunction extends AbstractStreamOperator<Event>
             return contain;
         }
         Set<String> computedColumnNames = FlinkSqlParser.parseComputedColumnNames(projection);
-        Set<String> filteredColumnNames = FlinkSqlParser.parseColumnNames(filter);
+        List<String> filteredColumnNames = FlinkSqlParser.parseColumnNameList(filter);
         for (String computedColumnName : computedColumnNames) {
             if (filteredColumnNames.contains(computedColumnName)) {
                 return true;

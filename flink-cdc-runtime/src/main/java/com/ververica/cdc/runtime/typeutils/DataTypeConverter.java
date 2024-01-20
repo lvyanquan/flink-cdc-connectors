@@ -39,6 +39,47 @@ public class DataTypeConverter {
     static final long NANOSECONDS_PER_MILLISECOND = TimeUnit.MILLISECONDS.toNanos(1);
     static final long NANOSECONDS_PER_DAY = TimeUnit.DAYS.toNanos(1);
 
+    public static Class<?> convertOriginalClass(DataType dataType) {
+        switch (dataType.getTypeRoot()) {
+            case BOOLEAN:
+                return Boolean.class;
+            case TINYINT:
+                return Byte.class;
+            case SMALLINT:
+                return Short.class;
+            case INTEGER:
+                return Integer.class;
+            case BIGINT:
+                return Long.class;
+            case DATE:
+                return Integer.class;
+            case TIME_WITHOUT_TIME_ZONE:
+                return Integer.class;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return TimestampData.class;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return LocalZonedTimestampData.class;
+            case FLOAT:
+                return Float.class;
+            case DOUBLE:
+                return Double.class;
+            case CHAR:
+            case VARCHAR:
+                return String.class;
+            case BINARY:
+            case VARBINARY:
+                return byte[].class;
+            case DECIMAL:
+                return DecimalData.class;
+            case ROW:
+                return Object.class;
+            case ARRAY:
+            case MAP:
+            default:
+                throw new UnsupportedOperationException("Unsupported type: " + dataType);
+        }
+    }
+
     public static Object convert(Object value, DataType dataType) {
         if (value == null) {
             return null;
@@ -74,6 +115,50 @@ public class DataTypeConverter {
                 return convertToBinary(value);
             case DECIMAL:
                 return convertToDecimal(value);
+            case ROW:
+                return value;
+            case ARRAY:
+            case MAP:
+            default:
+                throw new UnsupportedOperationException("Unsupported type: " + dataType);
+        }
+    }
+
+    public static Object convertToOriginal(Object value, DataType dataType) {
+        if (value == null) {
+            return null;
+        }
+        switch (dataType.getTypeRoot()) {
+            case BOOLEAN:
+                return convertToBoolean(value);
+            case TINYINT:
+                return convertToByte(value);
+            case SMALLINT:
+                return convertToShort(value);
+            case INTEGER:
+                return convertToInt(value);
+            case BIGINT:
+                return convertToLong(value);
+            case DATE:
+                return convertToDate(value);
+            case TIME_WITHOUT_TIME_ZONE:
+                return convertToTime(value);
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return convertToTimestamp(value);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return convertToLocalTimeZoneTimestamp(value);
+            case FLOAT:
+                return convertToFloat(value);
+            case DOUBLE:
+                return convertToDouble(value);
+            case CHAR:
+            case VARCHAR:
+                return convertToStringOriginal(value);
+            case BINARY:
+            case VARBINARY:
+                return convertToBinary(value);
+            case DECIMAL:
+                return convertToDecimalOriginal(value);
             case ROW:
                 return value;
             case ARRAY:
@@ -276,6 +361,10 @@ public class DataTypeConverter {
         return BinaryStringData.fromString(obj.toString());
     }
 
+    private static Object convertToStringOriginal(Object obj) {
+        return String.valueOf(obj);
+    }
+
     private static Object convertToBinary(Object obj) {
         if (obj instanceof byte[]) {
             return obj;
@@ -297,6 +386,18 @@ public class DataTypeConverter {
                     bigDecimalValue, bigDecimalValue.precision(), bigDecimalValue.scale());
         } else if (obj instanceof DecimalData) {
             return obj;
+        } else {
+            throw new UnsupportedOperationException(
+                    "Unsupported Decimal value type: " + obj.getClass().getSimpleName());
+        }
+    }
+
+    private static Object convertToDecimalOriginal(Object obj) {
+        if (obj instanceof BigDecimal) {
+            return obj;
+        } else if (obj instanceof DecimalData) {
+            DecimalData decimalData = (DecimalData) obj;
+            return decimalData.toBigDecimal();
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported Decimal value type: " + obj.getClass().getSimpleName());

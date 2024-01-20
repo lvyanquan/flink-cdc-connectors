@@ -86,7 +86,7 @@ public class FlinkSqlParser {
         if (StringUtils.isNullOrWhitespaceOnly(projection)) {
             return columnTransformList;
         }
-        SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
+        SqlSelect sqlSelect = parseProjectionExpression(projection);
         if (sqlSelect.getSelectList().isEmpty()) {
             return columnTransformList;
         }
@@ -126,7 +126,7 @@ public class FlinkSqlParser {
         if (StringUtils.isNullOrWhitespaceOnly(projection)) {
             return columnNames;
         }
-        SqlSelect sqlSelect = FlinkSqlParser.parseProjection(projection);
+        SqlSelect sqlSelect = parseProjectionExpression(projection);
         if (sqlSelect.getSelectList().isEmpty()) {
             return columnNames;
         }
@@ -154,41 +154,41 @@ public class FlinkSqlParser {
         return columnNames;
     }
 
-    public static Set<String> parseColumnNames(String filterExpression) {
-        Set<String> columnNameSet = new HashSet<>();
+    public static List<String> parseColumnNameList(String filterExpression) {
+        List<String> columnNameList = new ArrayList<>();
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
-            return columnNameSet;
+            return columnNameList;
         }
-        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
+        SqlSelect sqlSelect = parseFilterExpression(filterExpression);
         if (!sqlSelect.hasWhere()) {
-            return columnNameSet;
+            return columnNameList;
         }
         SqlNode where = sqlSelect.getWhere();
         if (!(where instanceof SqlBasicCall)) {
             throw new ParseException("Unrecognized where: " + where.toString());
         }
         SqlBasicCall sqlBasicCall = (SqlBasicCall) where;
-        findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameSet);
-        return columnNameSet;
+        findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
+        return columnNameList;
     }
 
-    private static void findSqlIdentifier(List<SqlNode> sqlNodes, Set<String> columnNameSet) {
+    private static void findSqlIdentifier(List<SqlNode> sqlNodes, List<String> columnNameList) {
         for (SqlNode sqlNode : sqlNodes) {
             if (sqlNode instanceof SqlIdentifier) {
-                columnNameSet.add(((SqlIdentifier) sqlNode).getSimple());
+                columnNameList.add(((SqlIdentifier) sqlNode).getSimple());
             } else if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
-                findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameSet);
+                findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
             }
         }
     }
 
-    public static SqlSelect parseProjection(String projection) {
+    public static SqlSelect parseProjectionExpression(String projection) {
         StringBuilder statement = new StringBuilder();
         statement.append("SELECT ");
         statement.append(projection);
         statement.append(" FROM TB");
-        return FlinkSqlParser.parseSelect(statement.toString());
+        return parseSelect(statement.toString());
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {
@@ -198,6 +198,6 @@ public class FlinkSqlParser {
             statement.append(" WHERE ");
             statement.append(filterExpression);
         }
-        return FlinkSqlParser.parseSelect(statement.toString());
+        return parseSelect(statement.toString());
     }
 }

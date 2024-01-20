@@ -24,12 +24,12 @@ import org.junit.Test;
 public class FlinkSqlParserTest {
 
     @Test
-    public void parserTest() {
+    public void testCalciteParser() {
         SqlSelect parse =
                 FlinkSqlParser.parseSelect(
-                        "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10");
+                        "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10 and id is not null");
         Assert.assertEquals(
                 "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
-        Assert.assertEquals("`uniq_id` > 10", parse.getWhere().toString());
+        Assert.assertEquals("`uniq_id` > 10 AND `id` IS NOT NULL", parse.getWhere().toString());
     }
 }

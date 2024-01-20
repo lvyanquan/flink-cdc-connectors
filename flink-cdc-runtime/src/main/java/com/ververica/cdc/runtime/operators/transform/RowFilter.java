@@ -16,104 +16,73 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import com.ververica.cdc.common.data.RecordData;
+import org.apache.flink.table.runtime.generated.CompileUtils;
+
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-import org.apache.commons.jexl3.JexlContext;
-import org.apache.commons.jexl3.JexlExpression;
-import org.apache.commons.jexl3.MapContext;
-import org.apache.commons.jexl3.internal.Engine;
+import com.ververica.cdc.runtime.parser.JaninoParser;
+import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
+import org.codehaus.janino.ExpressionEvaluator;
 
-import java.math.BigDecimal;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 /** The RowFilter applies to describe the row filter of filtering tables. */
 public class RowFilter {
-    private final Set<String> columnNames;
-    private final JexlExpression expression;
-    private static final Engine jexlEngine = new Engine();
+    private final String expression;
+    private final String scriptExpression;
+    private final List<String> columnNames;
+    private ExpressionEvaluator expressionEvaluator;
 
-    public RowFilter(Set<String> columnNames, JexlExpression expression) {
-        this.columnNames = columnNames;
+    public RowFilter(String expression, String scriptExpression, List<String> columnNames) {
         this.expression = expression;
+        this.scriptExpression = scriptExpression;
+        this.columnNames = columnNames;
     }
 
-    public Set<String> getColumnNames() {
-        return columnNames;
-    }
-
-    public JexlExpression getExpression() {
-        return expression;
-    }
-
-    public static RowFilter of(Set<String> columnNames, JexlExpression expression) {
-        return new RowFilter(columnNames, expression);
+    public static RowFilter of(
+            String expression, String scriptExpression, List<String> columnNames) {
+        return new RowFilter(expression, scriptExpression, columnNames);
     }
 
     public static RowFilter generateRowFilter(String filterExpression) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return null;
         }
-        Set<String> columnNames = FlinkSqlParser.parseColumnNames(filterExpression);
-        // a=b => a==b;
-        String jexlFilterExpression = filterExpression.replaceAll("=", "==");
-        JexlExpression expression = jexlEngine.createExpression(jexlFilterExpression);
-        return of(columnNames, expression);
-    }
-
-    public boolean run(BinaryRecordData after, List<Column> columns) {
-        JexlContext jexlContext = new MapContext();
-        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
-        for (int i = 0; i < columns.size(); i++) {
-            jexlContext.set(columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
-        }
-        Object evaluate = expression.evaluate(jexlContext);
-        return (Boolean) evaluate;
+        List<String> columnNames = FlinkSqlParser.parseColumnNameList(filterExpression);
+        String scriptExpression = JaninoParser.translateFilterToJaninoExpression(filterExpression);
+        return of(filterExpression, scriptExpression, columnNames);
     }
 
     public boolean run(BinaryRecordData after, TableInfo tableInfo) {
         List<Column> columns = tableInfo.getSchema().getColumns();
-        JexlContext jexlContext = new MapContext();
-        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
+        List<Object> params = new ArrayList<>();
+        List<Class<?>> paramTypes = new ArrayList<>();
         for (int i = 0; i < columns.size(); i++) {
-            jexlContext.set(columns.get(i).getName(), fieldGetters.get(i).getFieldOrNull(after));
+            if (columnNames.contains(columns.get(i).getName())) {
+                params.add(
+                        DataTypeConverter.convertToOriginal(
+                                after.getString(i), columns.get(i).getType()));
+                paramTypes.add(DataTypeConverter.convertOriginalClass(columns.get(i).getType()));
+            }
         }
-        Object evaluate = expression.evaluate(jexlContext);
-        return (Boolean) evaluate;
+        if (expressionEvaluator == null) {
+            expressionEvaluator =
+                    CompileUtils.compileExpression(
+                            scriptExpression, columnNames, paramTypes, Boolean.class);
+        }
+        try {
+            return (Boolean) expressionEvaluator.evaluate(params.toArray());
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        return true;
     }
 
     public boolean isVaild() {
         return !columnNames.isEmpty();
-    }
-
-    private Object fromDataType(Object value, DataType dataType) {
-        if (value == null) {
-            return value;
-        }
-        switch (dataType.getTypeRoot()) {
-            case CHAR:
-            case VARCHAR:
-                return value.toString();
-            case DECIMAL:
-                return BigDecimal.valueOf((long) value);
-            case TINYINT:
-            case SMALLINT:
-            case INTEGER:
-            case BIGINT:
-                return Integer.parseInt(value.toString());
-            case FLOAT:
-                return Float.parseFloat(value.toString());
-            case DOUBLE:
-                return Double.parseDouble(value.toString());
-            case BOOLEAN:
-                return Boolean.parseBoolean(value.toString());
-            default:
-                return value;
-        }
     }
 }
