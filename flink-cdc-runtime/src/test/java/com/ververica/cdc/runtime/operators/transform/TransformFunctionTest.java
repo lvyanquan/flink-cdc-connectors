@@ -79,12 +79,12 @@ public class TransformFunctionTest {
                     .build();
 
     @Test
-    void testDataChangeEventTransformProjection() throws Exception {
+    void testDataChangeEventTransform() throws Exception {
         TransformFunction transform =
                 TransformFunction.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
-                                "*, col2, col1 + col2 col12",
+                                "*, col2, concat(col1,col2) col12",
                                 "col1 = '1'")
                         .build();
         EventOperatorTestHarness<TransformFunction, Event>

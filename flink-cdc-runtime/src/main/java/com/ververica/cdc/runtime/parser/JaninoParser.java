@@ -32,6 +32,11 @@ import java.util.List;
 /** Use Janino parser to parse the statement of flink cdc pipeline transform. */
 public class JaninoParser {
 
+    public static String loadSystemFunction(String expression) {
+        return "import static com.ververica.cdc.runtime.functions.SystemFunctionUtils.*;"
+                + expression;
+    }
+
     public static String translateSqlNodeToJaninoExpression(SqlBasicCall transform) {
         Java.Rvalue rvalue = translateJaninoAST(transform);
         return rvalue.toString();

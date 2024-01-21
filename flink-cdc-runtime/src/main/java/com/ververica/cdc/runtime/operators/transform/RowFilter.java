@@ -22,6 +22,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
+import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -72,7 +73,10 @@ public class RowFilter {
         if (expressionEvaluator == null) {
             expressionEvaluator =
                     CompileUtils.compileExpression(
-                            scriptExpression, columnNames, paramTypes, Boolean.class);
+                            JaninoParser.loadSystemFunction(scriptExpression),
+                            columnNames,
+                            paramTypes,
+                            Boolean.class);
         }
         try {
             return (Boolean) expressionEvaluator.evaluate(params.toArray());

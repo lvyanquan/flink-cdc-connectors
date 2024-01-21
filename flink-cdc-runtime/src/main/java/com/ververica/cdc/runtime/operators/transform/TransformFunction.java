@@ -127,23 +127,36 @@ public class TransformFunction extends AbstractStreamOperator<Event>
                 throw new RuntimeException("Schema of " + tableId + " is not existed.");
             }
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
+            applyNewSchema(tableId, newSchema);
         }
         tableInfoMap.put(tableId, TableInfo.of(newSchema));
         return event;
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
-        tableInfoMap.put(createTableEvent.tableId(), TableInfo.of(createTableEvent.getSchema()));
         TableId tableId = createTableEvent.tableId();
+        tableInfoMap.put(tableId, TableInfo.of(createTableEvent.getSchema()));
         for (Tuple4<Selectors, Projector, RowFilter, Boolean> route : transforms) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
-                // update the column of projection and add the column of projection into Schema
+                // update the columns of projection and add the column of projection into Schema
                 return projector.applyCreateTableEvent(createTableEvent);
             }
         }
         return createTableEvent;
+    }
+
+    private void applyNewSchema(TableId tableId, Schema schema) {
+        tableInfoMap.put(tableId, TableInfo.of(schema));
+        for (Tuple4<Selectors, Projector, RowFilter, Boolean> route : transforms) {
+            Selectors selectors = route.f0;
+            if (selectors.isMatch(tableId)) {
+                Projector projector = route.f1;
+                // update the columns of projection
+                projector.applyNewSchema(schema);
+            }
+        }
     }
 
     private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent) {

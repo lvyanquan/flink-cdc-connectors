@@ -23,6 +23,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.StringUtils;
+import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -33,28 +34,27 @@ import java.util.List;
 
 /** The ColumnTransform applies to describe the information of the transformation column. */
 public class ColumnTransform implements Serializable {
-    private final String columnName;
-    private final DataType dataType;
+    private final Column column;
     private final String scriptExpression;
     private final List<String> originalColumnNames;
 
     public ColumnTransform(
-            String columnName,
-            DataType dataType,
-            String scriptExpression,
-            List<String> originalColumnNames) {
-        this.columnName = columnName;
-        this.dataType = dataType;
+            Column column, String scriptExpression, List<String> originalColumnNames) {
+        this.column = column;
         this.scriptExpression = scriptExpression;
         this.originalColumnNames = originalColumnNames;
     }
 
+    public Column getColumn() {
+        return column;
+    }
+
     public String getColumnName() {
-        return columnName;
+        return column.getName();
     }
 
     public DataType getDataType() {
-        return dataType;
+        return column.getType();
     }
 
     public boolean isValidProjection() {
@@ -80,10 +80,10 @@ public class ColumnTransform implements Serializable {
         }
         ExpressionEvaluator expressionEvaluator =
                 CompileUtils.compileExpression(
-                        scriptExpression,
+                        JaninoParser.loadSystemFunction(scriptExpression),
                         originalColumnNames,
                         paramTypes,
-                        DataTypeConverter.convertOriginalClass(dataType));
+                        DataTypeConverter.convertOriginalClass(column.getType()));
         try {
             return expressionEvaluator.evaluate(params.toArray());
         } catch (InvocationTargetException e) {
@@ -92,7 +92,7 @@ public class ColumnTransform implements Serializable {
     }
 
     public static ColumnTransform of(String columnName, DataType dataType) {
-        return new ColumnTransform(columnName, dataType, null, null);
+        return new ColumnTransform(Column.physicalColumn(columnName, dataType), null, null);
     }
 
     public static ColumnTransform of(
@@ -100,6 +100,7 @@ public class ColumnTransform implements Serializable {
             DataType dataType,
             String scriptExpression,
             List<String> originalColumnNames) {
-        return new ColumnTransform(columnName, dataType, scriptExpression, originalColumnNames);
+        return new ColumnTransform(
+                Column.physicalColumn(columnName, dataType), scriptExpression, originalColumnNames);
     }
 }

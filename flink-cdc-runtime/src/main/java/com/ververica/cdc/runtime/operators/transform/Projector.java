@@ -30,13 +30,13 @@ import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** The Projector applies to describe the projection of filtering tables. */
 public class Projector {
     private String projection;
     private final int includeAllSourceColumnIndex;
     private final List<ColumnTransform> columnTransformList;
+    private List<Column> allColumnList;
     private BinaryRecordDataGenerator recordDataGenerator;
 
     public Projector(
@@ -48,6 +48,7 @@ public class Projector {
         this.includeAllSourceColumnIndex = includeAllSourceColumnIndex;
         this.columnTransformList = columnTransformList;
         this.recordDataGenerator = recordDataGenerator;
+        this.allColumnList = getAllColumnList(new ArrayList<>());
     }
 
     public BinaryRecordDataGenerator getRecordDataGenerator() {
@@ -70,26 +71,10 @@ public class Projector {
                 projection, includeAllSourceColumnIndex, columnTransformList, recordDataGenerator);
     }
 
-    private static RowType toRowType(List<ColumnTransform> columnTransformList) {
-        DataType[] dataTypes =
-                columnTransformList.stream()
-                        .map(ColumnTransform::getDataType)
-                        .toArray(DataType[]::new);
-        String[] columnNames =
-                columnTransformList.stream()
-                        .map(ColumnTransform::getColumnName)
-                        .toArray(String[]::new);
+    private static RowType toRowType(List<Column> columnList) {
+        DataType[] dataTypes = columnList.stream().map(Column::getType).toArray(DataType[]::new);
+        String[] columnNames = columnList.stream().map(Column::getName).toArray(String[]::new);
         return RowType.of(dataTypes, columnNames);
-    }
-
-    private static List<Column> toColumnList(List<ColumnTransform> columnTransformList) {
-        return columnTransformList.stream()
-                .map(
-                        columnTransform -> {
-                            return Column.physicalColumn(
-                                    columnTransform.getColumnName(), columnTransform.getDataType());
-                        })
-                .collect(Collectors.toList());
     }
 
     public static Projector generateProjector(String projection) {
@@ -108,64 +93,83 @@ public class Projector {
                 break;
             }
         }
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(toRowType(columnTransformList));
-        return of(projection, includeAllSourceColumnIndex, columnTransformList, generator);
+        return of(projection, includeAllSourceColumnIndex, columnTransformList, null);
     }
 
     private boolean includeAllSourceColumn() {
         return includeAllSourceColumnIndex > -1;
     }
 
-    public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
-        List<Column> sourceColumns = createTableEvent.getSchema().getColumns();
-        List<ColumnTransform> sourceColumnTransform = new ArrayList<>();
-        sourceColumns.forEach(
-                sourceColumn -> {
+    private List<Column> getAllColumnList(List<Column> columns) {
+        List<Column> allColumnList = new ArrayList<>();
+        columnTransformList.forEach(
+                columnTransform -> {
+                    allColumnList.add(columnTransform.getColumn());
+                });
+        List<Column> sourceColumnList = new ArrayList<>();
+        columns.forEach(
+                column -> {
                     boolean isDuplicate = false;
                     for (ColumnTransform columnTransform : columnTransformList) {
-                        if (columnTransform.getColumnName().equals(sourceColumn.getName())) {
+                        if (columnTransform.getColumnName().equals(column.getName())) {
                             isDuplicate = true;
                             break;
                         }
                     }
                     if (!isDuplicate) {
-                        sourceColumnTransform.add(
-                                ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
+                        sourceColumnList.add(column);
                     }
                 });
         if (includeAllSourceColumn()) {
-            columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
+            allColumnList.addAll(includeAllSourceColumnIndex, sourceColumnList);
         }
-        recordDataGenerator = new BinaryRecordDataGenerator(toRowType(columnTransformList));
+        return allColumnList;
+    }
+
+    public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
+        applyNewSchema(createTableEvent.getSchema());
         // add the column of projection into Schema
-        Schema schema = createTableEvent.getSchema().copy(toColumnList(columnTransformList));
+        Schema schema = createTableEvent.getSchema().copy(allColumnList);
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
+    public void applyNewSchema(Schema schema) {
+        allColumnList = getAllColumnList(schema.getColumns());
+        recordDataGenerator = new BinaryRecordDataGenerator(toRowType(allColumnList));
+    }
+
     public BinaryRecordData recordData(BinaryRecordData after, TableInfo tableInfo) {
-        List<Object> starValueList = new ArrayList<>();
         List<Object> valueList = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
-        for (ColumnTransform columnTransform : columnTransformList) {
-            if (columnTransform.isValidProjection()) {
-                valueList.add(
-                        DataTypeConverter.convert(
-                                columnTransform.evaluate(after, tableInfo),
-                                columnTransform.getDataType()));
-            } else {
-                for (int i = 0; i < columns.size(); i++) {
-                    if (columns.get(i).getName().equals(columnTransform.getColumnName())) {
-                        valueList.add(
-                                DataTypeConverter.convert(
-                                        fieldGetters[i].getFieldOrNull(after),
-                                        columnTransform.getDataType()));
-                        break;
-                    }
+        for (Column column : allColumnList) {
+            boolean isColumnTransform = false;
+            for (ColumnTransform columnTransform : columnTransformList) {
+                if (column.getName().equals(columnTransform.getColumnName())
+                        && columnTransform.isValidProjection()) {
+                    valueList.add(
+                            DataTypeConverter.convert(
+                                    columnTransform.evaluate(after, tableInfo),
+                                    columnTransform.getDataType()));
+                    isColumnTransform = true;
+                    break;
                 }
+            }
+            if (!isColumnTransform) {
+                valueList.add(getValueFromBinaryRecordData(column.getName(), after, tableInfo));
             }
         }
         return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
+    }
+
+    private Object getValueFromBinaryRecordData(
+            String columnName, BinaryRecordData binaryRecordData, TableInfo tableInfo) {
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        for (int i = 0; i < columns.size(); i++) {
+            if (columnName.equals(columns.get(i).getName())) {
+                RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
+                return DataTypeConverter.convert(
+                        fieldGetters[i].getFieldOrNull(binaryRecordData), columns.get(i).getType());
+            }
+        }
+        return null;
     }
 }
