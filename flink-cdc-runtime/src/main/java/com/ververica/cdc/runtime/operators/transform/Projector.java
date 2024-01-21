@@ -27,13 +27,9 @@ import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
-import org.apache.commons.jexl3.JexlContext;
-import org.apache.commons.jexl3.MapContext;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /** The Projector applies to describe the projection of filtering tables. */
@@ -54,17 +50,15 @@ public class Projector {
         this.recordDataGenerator = recordDataGenerator;
     }
 
-    public List<ColumnTransform> getColumnTransformList() {
-        return columnTransformList;
-    }
-
     public BinaryRecordDataGenerator getRecordDataGenerator() {
         return recordDataGenerator;
     }
 
     public boolean isVaild() {
-        // includeAllSourceColumnIndex == 0 only has star.
-        return StringUtils.isNullOrWhitespaceOnly(projection) || includeAllSourceColumnIndex == 0;
+        // (projection.length() == 1 && includeAllSourceColumnIndex == 0): only star. Only star is
+        // invalid.
+        return !StringUtils.isNullOrWhitespaceOnly(projection)
+                && !(projection.length() == 1 && includeAllSourceColumnIndex == 0);
     }
 
     private static Projector of(
@@ -110,7 +104,7 @@ public class Projector {
             // the column name of star is ""
             if (columnTransformList.get(i).getColumnName().equals("")) {
                 includeAllSourceColumnIndex = i;
-                columnTransformList.remove(i);
+                columnTransformList.remove(includeAllSourceColumnIndex);
                 break;
             }
         }
@@ -128,8 +122,17 @@ public class Projector {
         List<ColumnTransform> sourceColumnTransform = new ArrayList<>();
         sourceColumns.forEach(
                 sourceColumn -> {
-                    sourceColumnTransform.add(
-                            ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
+                    boolean isDuplicate = false;
+                    for (ColumnTransform columnTransform : columnTransformList) {
+                        if (columnTransform.getColumnName().equals(sourceColumn.getName())) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (!isDuplicate) {
+                        sourceColumnTransform.add(
+                                ColumnTransform.of(sourceColumn.getName(), sourceColumn.getType()));
+                    }
                 });
         if (includeAllSourceColumn()) {
             columnTransformList.addAll(includeAllSourceColumnIndex, sourceColumnTransform);
@@ -141,27 +144,26 @@ public class Projector {
     }
 
     public BinaryRecordData recordData(BinaryRecordData after, TableInfo tableInfo) {
+        List<Object> starValueList = new ArrayList<>();
         List<Object> valueList = new ArrayList<>();
-        Map<String, Object> originalValueMap = new ConcurrentHashMap<>();
-        JexlContext jexlContext = new MapContext();
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
-        for (int i = 0; i < columns.size(); i++) {
-            originalValueMap.put(columns.get(i).getName(), fieldGetters[i].getFieldOrNull(after));
-            jexlContext.set(columns.get(i).getName(), fieldGetters[i].getFieldOrNull(after));
-        }
-
         for (ColumnTransform columnTransform : columnTransformList) {
-            if (originalValueMap.containsKey(columnTransform.getColumnName())) {
+            if (columnTransform.isValidProjection()) {
                 valueList.add(
                         DataTypeConverter.convert(
-                                originalValueMap.get(columnTransform.getColumnName()),
+                                columnTransform.evaluate(after, tableInfo),
                                 columnTransform.getDataType()));
             } else {
-                valueList.add(
-                        DataTypeConverter.convert(
-                                columnTransform.evaluate(jexlContext),
-                                columnTransform.getDataType()));
+                for (int i = 0; i < columns.size(); i++) {
+                    if (columns.get(i).getName().equals(columnTransform.getColumnName())) {
+                        valueList.add(
+                                DataTypeConverter.convert(
+                                        fieldGetters[i].getFieldOrNull(after),
+                                        columnTransform.getDataType()));
+                        break;
+                    }
+                }
             }
         }
         return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));

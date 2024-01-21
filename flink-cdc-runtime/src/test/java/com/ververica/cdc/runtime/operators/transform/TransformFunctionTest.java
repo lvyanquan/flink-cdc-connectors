@@ -84,7 +84,7 @@ public class TransformFunctionTest {
                 TransformFunction.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
-                                "*, col1 + col2 col12",
+                                "*, col2, col1 + col2 col12",
                                 "col1 = '1'")
                         .build();
         EventOperatorTestHarness<TransformFunction, Event>

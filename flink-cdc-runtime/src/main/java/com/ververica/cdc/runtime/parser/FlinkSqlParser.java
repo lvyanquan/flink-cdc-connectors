@@ -38,9 +38,7 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.validate.SqlConformance;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
 
@@ -81,12 +79,12 @@ public class FlinkSqlParser {
     }
 
     // Parse all columns
-    public static List<ColumnTransform> generateColumnTransforms(String projection) {
+    public static List<ColumnTransform> generateColumnTransforms(String projectionExpression) {
         List<ColumnTransform> columnTransformList = new ArrayList<>();
-        if (StringUtils.isNullOrWhitespaceOnly(projection)) {
+        if (StringUtils.isNullOrWhitespaceOnly(projectionExpression)) {
             return columnTransformList;
         }
-        SqlSelect sqlSelect = parseProjectionExpression(projection);
+        SqlSelect sqlSelect = parseProjectionExpression(projectionExpression);
         if (sqlSelect.getSelectList().isEmpty()) {
             return columnTransformList;
         }
@@ -104,8 +102,17 @@ public class FlinkSqlParser {
                             columnName = ((SqlIdentifier) operand).getSimple();
                         }
                     }
+                    for (ColumnTransform columnTransform : columnTransformList) {
+                        if (columnTransform.getColumnName().equals(columnName)) {
+                            throw new ParseException("Duplicate column definitions: " + columnName);
+                        }
+                    }
                     columnTransformList.add(
-                            ColumnTransform.of(columnName, DataTypes.STRING(), transform));
+                            ColumnTransform.of(
+                                    columnName,
+                                    DataTypes.STRING(),
+                                    JaninoParser.translateSqlNodeToJaninoExpression(transform),
+                                    parseColumnNameList(transform)));
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
                 }
@@ -120,9 +127,23 @@ public class FlinkSqlParser {
         return columnTransformList;
     }
 
-    // Parse computed columns
-    public static Set<String> parseComputedColumnNames(String projection) {
-        Set<String> columnNames = new HashSet<>();
+    public static String translateFilterExpressionToJaninoExpression(String filterExpression) {
+        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
+            return "";
+        }
+        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
+        if (!sqlSelect.hasWhere()) {
+            return "";
+        }
+        SqlNode where = sqlSelect.getWhere();
+        if (!(where instanceof SqlBasicCall)) {
+            throw new ParseException("Unrecognized where: " + where.toString());
+        }
+        return JaninoParser.translateSqlNodeToJaninoExpression((SqlBasicCall) where);
+    }
+
+    public static List<String> parseComputedColumnNames(String projection) {
+        List<String> columnNames = new ArrayList<>();
         if (StringUtils.isNullOrWhitespaceOnly(projection)) {
             return columnNames;
         }
@@ -141,6 +162,9 @@ public class FlinkSqlParser {
                             columnName = ((SqlIdentifier) operand).getSimple();
                         }
                     }
+                    if (columnNames.contains(columnName)) {
+                        throw new ParseException("Duplicate column definitions: " + columnName);
+                    }
                     columnNames.add(columnName);
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
@@ -154,20 +178,24 @@ public class FlinkSqlParser {
         return columnNames;
     }
 
-    public static List<String> parseColumnNameList(String filterExpression) {
-        List<String> columnNameList = new ArrayList<>();
+    public static List<String> parseFilterColumnNameList(String filterExpression) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
-            return columnNameList;
+            return new ArrayList<>();
         }
         SqlSelect sqlSelect = parseFilterExpression(filterExpression);
         if (!sqlSelect.hasWhere()) {
-            return columnNameList;
+            return new ArrayList<>();
         }
         SqlNode where = sqlSelect.getWhere();
         if (!(where instanceof SqlBasicCall)) {
             throw new ParseException("Unrecognized where: " + where.toString());
         }
         SqlBasicCall sqlBasicCall = (SqlBasicCall) where;
+        return parseColumnNameList(sqlBasicCall);
+    }
+
+    private static List<String> parseColumnNameList(SqlBasicCall sqlBasicCall) {
+        List<String> columnNameList = new ArrayList<>();
         findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
         return columnNameList;
     }
@@ -183,7 +211,7 @@ public class FlinkSqlParser {
         }
     }
 
-    public static SqlSelect parseProjectionExpression(String projection) {
+    private static SqlSelect parseProjectionExpression(String projection) {
         StringBuilder statement = new StringBuilder();
         statement.append("SELECT ");
         statement.append(projection);

@@ -90,12 +90,4 @@ public class JaninoParserTest {
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assert.assertEquals(evaluate, true);
     }
-
-    @Test
-    public void testTranslateFilterToJaninoExpression() {
-        String expression = "abs(uniq_id) > 10 and id is not null";
-        String janinoExpressionExpect = "abs(uniq_id) > 10 && null != id";
-        String janinoExpression = JaninoParser.translateFilterToJaninoExpression(expression);
-        Assert.assertEquals(janinoExpressionExpect, janinoExpression);
-    }
 }

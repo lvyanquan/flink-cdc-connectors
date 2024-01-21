@@ -18,13 +18,11 @@ package com.ververica.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 
-import com.ververica.cdc.common.utils.StringUtils;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlSelect;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.Java;
 
@@ -34,19 +32,8 @@ import java.util.List;
 /** Use Janino parser to parse the statement of flink cdc pipeline transform. */
 public class JaninoParser {
 
-    public static String translateFilterToJaninoExpression(String filterExpression) {
-        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
-            return "";
-        }
-        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
-        if (!sqlSelect.hasWhere()) {
-            return "";
-        }
-        SqlNode where = sqlSelect.getWhere();
-        if (!(where instanceof SqlBasicCall)) {
-            throw new ParseException("Unrecognized where: " + where.toString());
-        }
-        Java.Rvalue rvalue = translateJaninoAST((SqlBasicCall) where);
+    public static String translateSqlNodeToJaninoExpression(SqlBasicCall transform) {
+        Java.Rvalue rvalue = translateJaninoAST(transform);
         return rvalue.toString();
     }
 
@@ -78,35 +65,62 @@ public class JaninoParser {
         switch (sqlBasicCall.getKind()) {
             case AND:
                 return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "&&", atoms[1]);
+            case OR:
+                return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "||", atoms[1]);
             case EQUALS:
-                if (atoms.length != 2) {
-                    throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
-                }
-                if (atoms[0] instanceof Java.AmbiguousName) {
-                    if (atoms[0].toString().contains("String.valueOf(")) {
-                        return new Java.MethodInvocation(
-                                Location.NOWHERE, atoms[0], "equals", new Java.Rvalue[] {atoms[1]});
-                    } else if (atoms[1].toString().contains("String.valueOf(")) {
-                        return new Java.MethodInvocation(
-                                Location.NOWHERE, atoms[1], "equals", new Java.Rvalue[] {atoms[0]});
-                    }
-                }
-                return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "==", atoms[1]);
+                return generateEqualsOperation(sqlBasicCall, atoms);
+            case NOT_EQUALS:
+                return new Java.UnaryOperation(
+                        Location.NOWHERE, "!", generateEqualsOperation(sqlBasicCall, atoms));
+            case IS_NULL:
+                return new Java.UnaryOperation(Location.NOWHERE, "null == ", atoms[0]);
             case IS_NOT_NULL:
                 return new Java.UnaryOperation(Location.NOWHERE, "null != ", atoms[0]);
             case OTHER_FUNCTION:
                 return new Java.MethodInvocation(
                         Location.NOWHERE, null, sqlBasicCall.getOperator().getName(), atoms);
+            case PLUS:
+                return generateBinaryOperation(sqlBasicCall, atoms, "+");
+            case MINUS:
+                return generateBinaryOperation(sqlBasicCall, atoms, "-");
+            case TIMES:
+                return generateBinaryOperation(sqlBasicCall, atoms, "*");
+            case DIVIDE:
+                return generateBinaryOperation(sqlBasicCall, atoms, "/");
+            case MOD:
+                return generateBinaryOperation(sqlBasicCall, atoms, "%");
+            case LESS_THAN:
+            case GREATER_THAN:
+            case LESS_THAN_OR_EQUAL:
+            case GREATER_THAN_OR_EQUAL:
+                return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
             default:
-                String operation = sqlBasicCall.getKind().sql;
-                if (atoms.length > 1) {
-                    return new Java.BinaryOperation(
-                            Location.NOWHERE, atoms[0], operation, atoms[1]);
-                } else if (atoms.length == 1) {
-                    return new Java.UnaryOperation(Location.NOWHERE, operation, atoms[0]);
-                } else {
-                    throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
-                }
+                throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
         }
+    }
+
+    private static Java.Rvalue generateBinaryOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, String operator) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
+        }
+        return new Java.BinaryOperation(Location.NOWHERE, atoms[0], operator, atoms[1]);
+    }
+
+    private static Java.Rvalue generateEqualsOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
+        }
+        if (atoms[0] instanceof Java.AmbiguousName) {
+            if (atoms[0].toString().contains("String.valueOf(")) {
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, atoms[0], "equals", new Java.Rvalue[] {atoms[1]});
+            } else if (atoms[1].toString().contains("String.valueOf(")) {
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, atoms[1], "equals", new Java.Rvalue[] {atoms[0]});
+            }
+        }
+        return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "==", atoms[1]);
     }
 }

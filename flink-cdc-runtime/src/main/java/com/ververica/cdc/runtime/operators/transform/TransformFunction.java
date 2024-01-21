@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -218,8 +217,8 @@ public class TransformFunction extends AbstractStreamOperator<Event>
                 || StringUtils.isNullOrWhitespaceOnly(filter)) {
             return contain;
         }
-        Set<String> computedColumnNames = FlinkSqlParser.parseComputedColumnNames(projection);
-        List<String> filteredColumnNames = FlinkSqlParser.parseColumnNameList(filter);
+        List<String> computedColumnNames = FlinkSqlParser.parseComputedColumnNames(projection);
+        List<String> filteredColumnNames = FlinkSqlParser.parseFilterColumnNameList(filter);
         for (String computedColumnName : computedColumnNames) {
             if (filteredColumnNames.contains(computedColumnName)) {
                 return true;

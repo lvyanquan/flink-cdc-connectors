@@ -16,34 +16,37 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
+import org.apache.flink.table.runtime.generated.CompileUtils;
+
+import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
-import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.commons.jexl3.JexlContext;
-import org.apache.commons.jexl3.JexlExpression;
-import org.apache.commons.jexl3.internal.Engine;
+import com.ververica.cdc.common.utils.StringUtils;
+import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
+import org.codehaus.janino.ExpressionEvaluator;
 
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 
 /** The ColumnTransform applies to describe the information of the transformation column. */
 public class ColumnTransform implements Serializable {
     private final String columnName;
     private final DataType dataType;
-    private final SqlBasicCall transform;
-    private final JexlExpression expression;
-    private static final Engine jexlEngine = new Engine();
+    private final String scriptExpression;
+    private final List<String> originalColumnNames;
 
-    public ColumnTransform(String columnName, DataType dataType, SqlBasicCall transform) {
+    public ColumnTransform(
+            String columnName,
+            DataType dataType,
+            String scriptExpression,
+            List<String> originalColumnNames) {
         this.columnName = columnName;
         this.dataType = dataType;
-        this.transform = transform;
-        if (transform != null) {
-            String transformExpression = transform.toString();
-            // a=b => a==b;
-            transformExpression = transformExpression.replace("`", "").replaceAll("=", "==");
-            this.expression = jexlEngine.createExpression(transformExpression);
-        } else {
-            this.expression = null;
-        }
+        this.scriptExpression = scriptExpression;
+        this.originalColumnNames = originalColumnNames;
     }
 
     public String getColumnName() {
@@ -54,23 +57,49 @@ public class ColumnTransform implements Serializable {
         return dataType;
     }
 
-    public SqlBasicCall getTransform() {
-        return transform;
+    public boolean isValidProjection() {
+        return !StringUtils.isNullOrWhitespaceOnly(scriptExpression);
     }
 
-    public JexlExpression getExpression() {
-        return expression;
-    }
-
-    public Object evaluate(JexlContext jexlContext) {
-        return expression.evaluate(jexlContext);
+    public Object evaluate(BinaryRecordData after, TableInfo tableInfo) {
+        List<Object> params = new ArrayList<>();
+        List<Class<?>> paramTypes = new ArrayList<>();
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
+        for (String originalColumnName : originalColumnNames) {
+            for (int i = 0; i < columns.size(); i++) {
+                Column column = columns.get(i);
+                if (column.getName().equals(originalColumnName)) {
+                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    params.add(
+                            DataTypeConverter.convertToOriginal(
+                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                    break;
+                }
+            }
+        }
+        ExpressionEvaluator expressionEvaluator =
+                CompileUtils.compileExpression(
+                        scriptExpression,
+                        originalColumnNames,
+                        paramTypes,
+                        DataTypeConverter.convertOriginalClass(dataType));
+        try {
+            return expressionEvaluator.evaluate(params.toArray());
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static ColumnTransform of(String columnName, DataType dataType) {
-        return new ColumnTransform(columnName, dataType, null);
+        return new ColumnTransform(columnName, dataType, null, null);
     }
 
-    public static ColumnTransform of(String columnName, DataType dataType, SqlBasicCall transform) {
-        return new ColumnTransform(columnName, dataType, transform);
+    public static ColumnTransform of(
+            String columnName,
+            DataType dataType,
+            String scriptExpression,
+            List<String> originalColumnNames) {
+        return new ColumnTransform(columnName, dataType, scriptExpression, originalColumnNames);
     }
 }

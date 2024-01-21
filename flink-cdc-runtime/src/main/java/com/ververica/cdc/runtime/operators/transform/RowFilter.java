@@ -22,7 +22,6 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -52,8 +51,9 @@ public class RowFilter {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return null;
         }
-        List<String> columnNames = FlinkSqlParser.parseColumnNameList(filterExpression);
-        String scriptExpression = JaninoParser.translateFilterToJaninoExpression(filterExpression);
+        List<String> columnNames = FlinkSqlParser.parseFilterColumnNameList(filterExpression);
+        String scriptExpression =
+                FlinkSqlParser.translateFilterExpressionToJaninoExpression(filterExpression);
         return of(filterExpression, scriptExpression, columnNames);
     }
 
