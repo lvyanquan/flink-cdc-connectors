@@ -21,6 +21,7 @@ import com.ververica.cdc.common.data.LocalZonedTimestampData;
 import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.types.DataType;
+import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -73,6 +74,49 @@ public class DataTypeConverter {
                 return DecimalData.class;
             case ROW:
                 return Object.class;
+            case ARRAY:
+            case MAP:
+            default:
+                throw new UnsupportedOperationException("Unsupported type: " + dataType);
+        }
+    }
+
+    public static SqlTypeName convertCalciteType(DataType dataType) {
+        switch (dataType.getTypeRoot()) {
+            case BOOLEAN:
+                return SqlTypeName.BOOLEAN;
+            case TINYINT:
+                return SqlTypeName.TINYINT;
+            case SMALLINT:
+                return SqlTypeName.SMALLINT;
+            case INTEGER:
+                return SqlTypeName.INTEGER;
+            case BIGINT:
+                return SqlTypeName.BIGINT;
+            case DATE:
+                return SqlTypeName.DATE;
+            case TIME_WITHOUT_TIME_ZONE:
+                return SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return SqlTypeName.TIMESTAMP;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
+            case FLOAT:
+                return SqlTypeName.FLOAT;
+            case DOUBLE:
+                return SqlTypeName.DOUBLE;
+            case CHAR:
+                return SqlTypeName.CHAR;
+            case VARCHAR:
+                return SqlTypeName.VARCHAR;
+            case BINARY:
+                return SqlTypeName.BINARY;
+            case VARBINARY:
+                return SqlTypeName.VARBINARY;
+            case DECIMAL:
+                return SqlTypeName.DECIMAL;
+            case ROW:
+                return SqlTypeName.ROW;
             case ARRAY:
             case MAP:
             default:

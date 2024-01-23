@@ -16,14 +16,49 @@
 
 package com.ververica.cdc.runtime.parser;
 
+import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
+
+import com.ververica.cdc.common.schema.Schema;
+import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
+import com.ververica.cdc.runtime.parser.validate.FlinkCDCSchemaFactory;
+import org.apache.calcite.config.CalciteConnectionConfigImpl;
+import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.util.SqlOperatorTables;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.tools.RelBuilder;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 /** Unit tests for the {@link FlinkSqlParser}. */
 public class FlinkSqlParserTest {
+
+    private static final Schema CUSTOMERS_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING())
+                    .physicalColumn("order_id", DataTypes.STRING())
+                    .primaryKey("id")
+                    .build();
 
     @Test
     public void testCalciteParser() {
@@ -33,6 +68,107 @@ public class FlinkSqlParserTest {
         Assert.assertEquals(
                 "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
         Assert.assertEquals("`uniq_id` > 10 AND `id` IS NOT NULL", parse.getWhere().toString());
+    }
+
+    @Test
+    public void testFlinkCalciteValidate() {
+        SqlSelect parse =
+                FlinkSqlParser.parseSelect(
+                        "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
+
+        CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        Map<String, Object> operand = new HashMap<>();
+        operand.put("tableName", "tb");
+        operand.put("columns", CUSTOMERS_SCHEMA.getColumns());
+        org.apache.calcite.schema.Schema schema =
+                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), "default_schema", operand);
+        rootSchema.add("default_schema", schema);
+        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        CalciteCatalogReader calciteCatalogReader =
+                new CalciteCatalogReader(
+                        rootSchema,
+                        rootSchema.path("default_schema"),
+                        factory,
+                        new CalciteConnectionConfigImpl(new Properties()));
+        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlValidator validator =
+                SqlValidatorUtil.newValidator(
+                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        calciteCatalogReader,
+                        factory,
+                        SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
+        SqlNode validateSqlNode = validator.validate(parse);
+        Assert.assertEquals(
+                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
+                parse.getSelectList().toString());
+        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
+        Assert.assertEquals(
+                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                        + "FROM `default_schema`.`tb` AS `tb`\n"
+                        + "WHERE `tb`.`id` IS NOT NULL",
+                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+    }
+
+    @Test
+    public void testCalciteRelNode() {
+        SqlSelect parse =
+                FlinkSqlParser.parseSelect(
+                        "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
+
+        CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        Map<String, Object> operand = new HashMap<>();
+        operand.put("tableName", "tb");
+        operand.put("columns", CUSTOMERS_SCHEMA.getColumns());
+        org.apache.calcite.schema.Schema schema =
+                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), "default_schema", operand);
+        rootSchema.add("default_schema", schema);
+        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        CalciteCatalogReader calciteCatalogReader =
+                new CalciteCatalogReader(
+                        rootSchema,
+                        rootSchema.path("default_schema"),
+                        factory,
+                        new CalciteConnectionConfigImpl(new Properties()));
+        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlValidator validator =
+                SqlValidatorUtil.newValidator(
+                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        calciteCatalogReader,
+                        factory,
+                        SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
+        SqlNode validateSqlNode = validator.validate(parse);
+        RexBuilder rexBuilder = new RexBuilder(factory);
+        HepProgramBuilder builder = new HepProgramBuilder();
+        HepPlanner planner = new HepPlanner(builder.build());
+        RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
+        SqlToRelConverter.Config config = SqlToRelConverter.config().withTrimUnusedFields(false);
+        SqlToRelConverter sqlToRelConverter =
+                new SqlToRelConverter(
+                        null,
+                        validator,
+                        calciteCatalogReader,
+                        cluster,
+                        StandardConvertletTable.INSTANCE,
+                        config);
+        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
+        relRoot = relRoot.withRel(sqlToRelConverter.flattenTypes(relRoot.rel, true));
+        RelBuilder relBuilder = config.getRelBuilderFactory().create(cluster, null);
+        relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, relBuilder));
+        RelNode relNode = relRoot.rel;
+        Assert.assertEquals(
+                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
+                parse.getSelectList().toString());
+        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
+        Assert.assertEquals(
+                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                        + "FROM `default_schema`.`tb` AS `tb`\n"
+                        + "WHERE `tb`.`id` IS NOT NULL",
+                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+        Assert.assertEquals(
+                "rel#5:LogicalProject.(input=LogicalTableScan#4,exprs=[SUBSTR($0, 1), $0, $1])",
+                relNode.toString());
     }
 
     @Test
