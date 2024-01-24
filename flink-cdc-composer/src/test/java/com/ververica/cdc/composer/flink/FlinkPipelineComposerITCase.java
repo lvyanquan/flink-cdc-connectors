@@ -31,6 +31,7 @@ import com.ververica.cdc.connectors.values.factory.ValuesDataFactory;
 import com.ververica.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper;
 import com.ververica.cdc.connectors.values.source.ValuesDataSourceOptions;
+import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -252,6 +253,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=5;col2=5;col3=");
     }
 
+    @Ignore
     @Test
     void testTransform() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();

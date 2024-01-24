@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -31,8 +30,6 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.schema.Selectors;
 import com.ververica.cdc.common.utils.SchemaUtils;
-import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,36 +38,36 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/** A process function that applies user-defined transform logics. */
-public class TransformFunction extends AbstractStreamOperator<Event>
+/** A schema process function that applies user-defined transform logics. */
+public class TransformSchemaFunction extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
-    private final List<Tuple3<String, String, String>> transformRules;
-    private transient List<Tuple4<Selectors, Projector, RowFilter, Boolean>> transforms;
+    private final List<Tuple2<String, String>> transformRules;
+    private transient List<Tuple2<Selectors, Projector>> transforms;
 
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
 
-    public static TransformFunction.Builder newBuilder() {
-        return new TransformFunction.Builder();
+    public static TransformSchemaFunction.Builder newBuilder() {
+        return new TransformSchemaFunction.Builder();
     }
 
-    /** Builder of {@link TransformFunction}. */
+    /** Builder of {@link TransformSchemaFunction}. */
     public static class Builder {
-        private final List<Tuple3<String, String, String>> transformRules = new ArrayList<>();
+        private final List<Tuple2<String, String>> transformRules = new ArrayList<>();
 
-        public TransformFunction.Builder addTransform(
-                String tableInclusions, String projection, String filter) {
-            transformRules.add(Tuple3.of(tableInclusions, projection, filter));
+        public TransformSchemaFunction.Builder addTransform(
+                String tableInclusions, String projection) {
+            transformRules.add(Tuple2.of(tableInclusions, projection));
             return this;
         }
 
-        public TransformFunction build() {
-            return new TransformFunction(transformRules);
+        public TransformSchemaFunction build() {
+            return new TransformSchemaFunction(transformRules);
         }
     }
 
-    private TransformFunction(List<Tuple3<String, String, String>> transformRules) {
+    private TransformSchemaFunction(List<Tuple2<String, String>> transformRules) {
         this.transformRules = transformRules;
         this.tableInfoMap = new ConcurrentHashMap<>();
     }
@@ -81,21 +78,16 @@ public class TransformFunction extends AbstractStreamOperator<Event>
         transforms =
                 transformRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.f0;
-                                    String projection = tuple3.f1;
-                                    String filterExpression = tuple3.f2;
+                                tuple2 -> {
+                                    String tableInclusions = tuple2.f0;
+                                    String projection = tuple2.f1;
 
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
                                                     .includeTables(tableInclusions)
                                                     .build();
-                                    return new Tuple4<>(
-                                            selectors,
-                                            Projector.generateProjector(projection),
-                                            RowFilter.generateRowFilter(filterExpression),
-                                            containFilteredComputedColumn(
-                                                    projection, filterExpression));
+                                    return new Tuple2<>(
+                                            selectors, Projector.generateProjector(projection));
                                 })
                         .collect(Collectors.toList());
     }
@@ -136,7 +128,7 @@ public class TransformFunction extends AbstractStreamOperator<Event>
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
         tableInfoMap.put(tableId, TableInfo.of(createTableEvent.getSchema()));
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> route : transforms) {
+        for (Tuple2<Selectors, Projector> route : transforms) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
@@ -149,7 +141,7 @@ public class TransformFunction extends AbstractStreamOperator<Event>
 
     private void applyNewSchema(TableId tableId, Schema schema) {
         tableInfoMap.put(tableId, TableInfo.of(schema));
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> route : transforms) {
+        for (Tuple2<Selectors, Projector> route : transforms) {
             Selectors selectors = route.f0;
             if (selectors.isMatch(tableId)) {
                 Projector projector = route.f1;
@@ -163,23 +155,11 @@ public class TransformFunction extends AbstractStreamOperator<Event>
         Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
         TableId tableId = dataChangeEvent.tableId();
 
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> transform : transforms) {
+        for (Tuple2<Selectors, Projector> transform : transforms) {
             Selectors selectors = transform.f0;
-            Boolean isPreProjection = transform.f3;
             if (selectors.isMatch(tableId)) {
                 Projector projector = transform.f1;
-                if (isPreProjection && projector != null && projector.isVaild()) {
-                    dataChangeEventOptional =
-                            applyProjection(projector, dataChangeEventOptional.get());
-                }
-                RowFilter rowFilter = transform.f2;
-                if (rowFilter != null && rowFilter.isVaild()) {
-                    dataChangeEventOptional = applyFilter(rowFilter, dataChangeEventOptional.get());
-                }
-                if (!isPreProjection
-                        && dataChangeEventOptional.isPresent()
-                        && projector != null
-                        && projector.isVaild()) {
+                if (projector != null && projector.isVaild()) {
                     dataChangeEventOptional =
                             applyProjection(projector, dataChangeEventOptional.get());
                 }
@@ -188,55 +168,21 @@ public class TransformFunction extends AbstractStreamOperator<Event>
         return dataChangeEventOptional;
     }
 
-    private Optional applyFilter(RowFilter rowFilter, DataChangeEvent dataChangeEvent) {
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        // insert and update event only apply afterData, delete only apply beforeData
-        if (after != null) {
-            if (rowFilter.run(after, tableInfoMap.get(dataChangeEvent.tableId()))) {
-                return Optional.of(dataChangeEvent);
-            } else {
-                return Optional.empty();
-            }
-        } else if (before != null) {
-            if (rowFilter.run(before, tableInfoMap.get(dataChangeEvent.tableId()))) {
-                return Optional.of(dataChangeEvent);
-            } else {
-                return Optional.empty();
-            }
-        }
-        return Optional.empty();
-    }
-
     private Optional applyProjection(Projector projector, DataChangeEvent dataChangeEvent) {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
             BinaryRecordData data =
-                    projector.recordData(before, tableInfoMap.get(dataChangeEvent.tableId()));
+                    projector.recordFillDataField(
+                            before, tableInfoMap.get(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
         }
         if (after != null) {
             BinaryRecordData data =
-                    projector.recordData(after, tableInfoMap.get(dataChangeEvent.tableId()));
+                    projector.recordFillDataField(
+                            after, tableInfoMap.get(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
         }
         return Optional.of(dataChangeEvent);
-    }
-
-    private boolean containFilteredComputedColumn(String projection, String filter) {
-        boolean contain = false;
-        if (StringUtils.isNullOrWhitespaceOnly(projection)
-                || StringUtils.isNullOrWhitespaceOnly(filter)) {
-            return contain;
-        }
-        List<String> computedColumnNames = FlinkSqlParser.parseComputedColumnNames(projection);
-        List<String> filteredColumnNames = FlinkSqlParser.parseFilterColumnNameList(filter);
-        for (String computedColumnName : computedColumnNames) {
-            if (filteredColumnNames.contains(computedColumnName)) {
-                return true;
-            }
-        }
-        return contain;
     }
 }

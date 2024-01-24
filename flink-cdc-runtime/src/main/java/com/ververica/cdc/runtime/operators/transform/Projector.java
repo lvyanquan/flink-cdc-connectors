@@ -138,6 +138,25 @@ public class Projector {
         recordDataGenerator = new BinaryRecordDataGenerator(toRowType(allColumnList));
     }
 
+    public BinaryRecordData recordFillDataField(BinaryRecordData data, TableInfo tableInfo) {
+        List<Object> valueList = new ArrayList<>();
+        for (Column column : allColumnList) {
+            boolean isColumnTransform = false;
+            for (ColumnTransform columnTransform : columnTransformList) {
+                if (column.getName().equals(columnTransform.getColumnName())
+                        && columnTransform.isValidProjection()) {
+                    valueList.add(null);
+                    isColumnTransform = true;
+                    break;
+                }
+            }
+            if (!isColumnTransform) {
+                valueList.add(getValueFromBinaryRecordData(column.getName(), data, tableInfo));
+            }
+        }
+        return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
+    }
+
     public BinaryRecordData recordData(BinaryRecordData after, TableInfo tableInfo) {
         List<Object> valueList = new ArrayList<>();
         for (Column column : allColumnList) {

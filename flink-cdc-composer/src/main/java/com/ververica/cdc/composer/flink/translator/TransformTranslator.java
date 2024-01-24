@@ -20,7 +20,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
-import com.ververica.cdc.runtime.operators.transform.TransformFunction;
+import com.ververica.cdc.runtime.operators.transform.TransformDataFunction;
+import com.ververica.cdc.runtime.operators.transform.TransformSchemaFunction;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
 import java.util.List;
@@ -28,12 +29,30 @@ import java.util.List;
 /** Translator for transform. */
 public class TransformTranslator {
 
-    public DataStream<Event> translate(DataStream<Event> input, List<TransformDef> transforms) {
+    public DataStream<Event> translateSchema(
+            DataStream<Event> input, List<TransformDef> transforms) {
         if (transforms.isEmpty()) {
             return input;
         }
 
-        TransformFunction.Builder transformFunctionBuilder = TransformFunction.newBuilder();
+        TransformSchemaFunction.Builder transformSchemaFunctionBuilder =
+                TransformSchemaFunction.newBuilder();
+        for (TransformDef transform : transforms) {
+            if (transform.isValidProjection() || transform.isValidFilter()) {
+                transformSchemaFunctionBuilder.addTransform(
+                        transform.getSourceTable(), transform.getProjection().get());
+            }
+        }
+        return input.transform(
+                "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
+    }
+
+    public DataStream<Event> translateData(DataStream<Event> input, List<TransformDef> transforms) {
+        if (transforms.isEmpty()) {
+            return input;
+        }
+
+        TransformDataFunction.Builder transformFunctionBuilder = TransformDataFunction.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 transformFunctionBuilder.addTransform(
@@ -42,6 +61,7 @@ public class TransformTranslator {
                         transform.getFilter().get());
             }
         }
-        return input.transform("Transform", new EventTypeInfo(), transformFunctionBuilder.build());
+        return input.transform(
+                "Transform:Data", new EventTypeInfo(), transformFunctionBuilder.build());
     }
 }

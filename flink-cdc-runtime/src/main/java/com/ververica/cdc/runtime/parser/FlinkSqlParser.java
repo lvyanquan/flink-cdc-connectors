@@ -22,23 +22,46 @@ import org.apache.flink.table.api.SqlDialect;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.planner.calcite.CalciteConfig;
 import org.apache.flink.table.planner.delegation.FlinkSqlParserFactories;
+import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
 import org.apache.flink.table.planner.parse.CalciteParser;
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 
+import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
+import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
+import com.ververica.cdc.runtime.parser.validate.FlinkCDCSchemaFactory;
+import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformance;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.sql2rel.StandardConvertletTable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
 
@@ -46,6 +69,8 @@ import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteCo
 public class FlinkSqlParser {
 
     private static final CalciteParser calciteParser = getCalciteParser();
+    private static final String DEFAULT_SCHEMA = "default_schema";
+    private static final String DEFAULT_TABLE = "TB";
 
     private static CalciteParser getCalciteParser() {
         TableConfig tableConfig = TableConfig.getDefault();
@@ -67,6 +92,46 @@ public class FlinkSqlParser {
                                             .withIdentifierMaxLength(256);
                                 });
         return new CalciteParser(sqlParserConfig);
+    }
+
+    private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
+        CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        Map<String, Object> operand = new HashMap<>();
+        operand.put("tableName", DEFAULT_TABLE);
+        operand.put("columns", columns);
+        rootSchema.add(
+                DEFAULT_SCHEMA,
+                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
+        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        CalciteCatalogReader calciteCatalogReader =
+                new CalciteCatalogReader(
+                        rootSchema,
+                        rootSchema.path(DEFAULT_SCHEMA),
+                        factory,
+                        new CalciteConnectionConfigImpl(new Properties()));
+        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlValidator validator =
+                SqlValidatorUtil.newValidator(
+                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        calciteCatalogReader,
+                        factory,
+                        SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
+        SqlNode validateSqlNode = validator.validate(sqlNode);
+        HepProgramBuilder builder = new HepProgramBuilder();
+        HepPlanner planner = new HepPlanner(builder.build());
+        RelOptCluster cluster = RelOptCluster.create(planner, new RexBuilder(factory));
+        SqlToRelConverter.Config config = SqlToRelConverter.config().withTrimUnusedFields(false);
+        SqlToRelConverter sqlToRelConverter =
+                new SqlToRelConverter(
+                        null,
+                        validator,
+                        calciteCatalogReader,
+                        cluster,
+                        StandardConvertletTable.INSTANCE,
+                        config);
+        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
+        return relRoot.rel;
     }
 
     public static SqlSelect parseSelect(String statement) {
@@ -215,13 +280,15 @@ public class FlinkSqlParser {
         StringBuilder statement = new StringBuilder();
         statement.append("SELECT ");
         statement.append(projection);
-        statement.append(" FROM TB");
+        statement.append(" FROM ");
+        statement.append(DEFAULT_TABLE);
         return parseSelect(statement.toString());
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {
         StringBuilder statement = new StringBuilder();
-        statement.append("SELECT * FROM TB");
+        statement.append("SELECT * FROM ");
+        statement.append(DEFAULT_TABLE);
         if (!StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             statement.append(" WHERE ");
             statement.append(filterExpression);
