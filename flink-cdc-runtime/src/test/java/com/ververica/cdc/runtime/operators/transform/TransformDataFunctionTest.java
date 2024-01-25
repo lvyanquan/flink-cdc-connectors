@@ -72,7 +72,7 @@ public class TransformDataFunctionTest {
                 TransformDataFunction.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
-                                "*, col2, concat(col1,col2) col12",
+                                "*, concat(col1,col2) col12",
                                 "col1 = '1'")
                         .build();
         EventOperatorTestHarness<TransformDataFunction, Event>

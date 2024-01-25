@@ -27,11 +27,11 @@ import org.apache.flink.table.planner.parse.CalciteParser;
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 
 import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
 import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
 import com.ververica.cdc.runtime.parser.validate.FlinkCDCSchemaFactory;
+import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -41,6 +41,8 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlBasicCall;
@@ -62,6 +64,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
 
@@ -144,15 +147,22 @@ public class FlinkSqlParser {
     }
 
     // Parse all columns
-    public static List<ColumnTransform> generateColumnTransforms(String projectionExpression) {
-        List<ColumnTransform> columnTransformList = new ArrayList<>();
+    public static List<ColumnTransform> generateColumnTransforms(
+            String projectionExpression, List<Column> columns) {
         if (StringUtils.isNullOrWhitespaceOnly(projectionExpression)) {
-            return columnTransformList;
+            return new ArrayList<>();
         }
         SqlSelect sqlSelect = parseProjectionExpression(projectionExpression);
         if (sqlSelect.getSelectList().isEmpty()) {
-            return columnTransformList;
+            return new ArrayList<>();
         }
+        RelNode relNode = sqlToRel(columns, sqlSelect);
+        Map<String, RelDataType> relDataTypeMap =
+                relNode.getRowType().getFieldList().stream()
+                        .collect(
+                                Collectors.toMap(
+                                        RelDataTypeField::getName, RelDataTypeField::getType));
+        List<ColumnTransform> columnTransformList = new ArrayList<>();
         for (SqlNode sqlNode : sqlSelect.getSelectList()) {
             if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
@@ -164,27 +174,47 @@ public class FlinkSqlParser {
                         if (operand instanceof SqlBasicCall) {
                             transform = (SqlBasicCall) operand;
                         } else if (operand instanceof SqlIdentifier) {
-                            columnName = ((SqlIdentifier) operand).getSimple();
+                            SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
+                            columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                         }
                     }
-                    for (ColumnTransform columnTransform : columnTransformList) {
-                        if (columnTransform.getColumnName().equals(columnName)) {
-                            throw new ParseException("Duplicate column definitions: " + columnName);
+                    boolean hasReplacedDuplicateColumn = false;
+                    for (int i = 0; i < columnTransformList.size(); i++) {
+                        if (columnTransformList.get(i).getColumnName().equals(columnName)
+                                && !columnTransformList.get(i).isValidProjection()) {
+                            hasReplacedDuplicateColumn = true;
+                            columnTransformList.set(
+                                    i,
+                                    ColumnTransform.of(
+                                            columnName,
+                                            DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                                    relDataTypeMap.get(columnName)),
+                                            JaninoParser.translateSqlNodeToJaninoExpression(
+                                                    transform),
+                                            parseColumnNameList(transform)));
+                            break;
                         }
                     }
-                    columnTransformList.add(
-                            ColumnTransform.of(
-                                    columnName,
-                                    DataTypes.STRING(),
-                                    JaninoParser.translateSqlNodeToJaninoExpression(transform),
-                                    parseColumnNameList(transform)));
+                    if (!hasReplacedDuplicateColumn) {
+                        columnTransformList.add(
+                                ColumnTransform.of(
+                                        columnName,
+                                        DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                                relDataTypeMap.get(columnName)),
+                                        JaninoParser.translateSqlNodeToJaninoExpression(transform),
+                                        parseColumnNameList(transform)));
+                    }
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                 columnTransformList.add(
-                        ColumnTransform.of(sqlIdentifier.getSimple(), DataTypes.STRING()));
+                        ColumnTransform.of(
+                                columnName,
+                                DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                        relDataTypeMap.get(columnName))));
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }
@@ -224,7 +254,8 @@ public class FlinkSqlParser {
                     List<SqlNode> operandList = sqlBasicCall.getOperandList();
                     for (SqlNode operand : operandList) {
                         if (operand instanceof SqlIdentifier) {
-                            columnName = ((SqlIdentifier) operand).getSimple();
+                            SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
+                            columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                         }
                     }
                     if (columnNames.contains(columnName)) {
@@ -268,7 +299,9 @@ public class FlinkSqlParser {
     private static void findSqlIdentifier(List<SqlNode> sqlNodes, List<String> columnNameList) {
         for (SqlNode sqlNode : sqlNodes) {
             if (sqlNode instanceof SqlIdentifier) {
-                columnNameList.add(((SqlIdentifier) sqlNode).getSimple());
+                SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                columnNameList.add(columnName);
             } else if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);

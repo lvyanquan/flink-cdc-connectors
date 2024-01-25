@@ -110,8 +110,8 @@ public class TransformSchemaFunctionTest {
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("2"),
-                                    new BinaryStringData("3"),
-                                    null
+                                    null,
+                                    new BinaryStringData("3")
                                 }));
 
         // Update
@@ -137,15 +137,15 @@ public class TransformSchemaFunctionTest {
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("2"),
-                                    new BinaryStringData("3"),
-                                    null
+                                    null,
+                                    new BinaryStringData("3")
                                 }),
                         recordDataGeneratorExpect.generate(
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("3"),
-                                    new BinaryStringData("3"),
-                                    null
+                                    null,
+                                    new BinaryStringData("3")
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(

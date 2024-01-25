@@ -19,7 +19,11 @@ package com.ververica.cdc.runtime.functions;
 /** System function utils to support the call of flink cdc pipeline transform. */
 public class SystemFunctionUtils {
 
-    public static String concat(String... str) {
+    public static String CONCAT(String... str) {
         return String.join("", str);
+    }
+
+    public static String substr(String str, int length) {
+        return str.substring(length);
     }
 }

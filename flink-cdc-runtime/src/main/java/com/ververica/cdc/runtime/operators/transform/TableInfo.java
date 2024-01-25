@@ -19,6 +19,8 @@ package com.ververica.cdc.runtime.operators.transform;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.utils.SchemaUtils;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.List;
 
@@ -26,10 +28,15 @@ import java.util.List;
 public class TableInfo {
     private Schema schema;
     private RecordData.FieldGetter[] fieldGetters;
+    private BinaryRecordDataGenerator recordDataGenerator;
 
-    public TableInfo(Schema schema, RecordData.FieldGetter[] fieldGetters) {
+    public TableInfo(
+            Schema schema,
+            RecordData.FieldGetter[] fieldGetters,
+            BinaryRecordDataGenerator recordDataGenerator) {
         this.schema = schema;
         this.fieldGetters = fieldGetters;
+        this.recordDataGenerator = recordDataGenerator;
     }
 
     public Schema getSchema() {
@@ -40,9 +47,16 @@ public class TableInfo {
         return fieldGetters;
     }
 
+    public BinaryRecordDataGenerator getRecordDataGenerator() {
+        return recordDataGenerator;
+    }
+
     public static TableInfo of(Schema schema) {
         List<RecordData.FieldGetter> fieldGetters =
                 SchemaUtils.createFieldGetters(schema.getColumns());
-        return new TableInfo(schema, fieldGetters.toArray(new RecordData.FieldGetter[0]));
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(DataTypeConverter.toRowType(schema.getColumns()));
+        return new TableInfo(
+                schema, fieldGetters.toArray(new RecordData.FieldGetter[0]), recordDataGenerator);
     }
 }

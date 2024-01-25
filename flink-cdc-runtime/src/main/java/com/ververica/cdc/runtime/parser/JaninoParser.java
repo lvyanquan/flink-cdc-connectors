@@ -48,9 +48,8 @@ public class JaninoParser {
         for (SqlNode sqlNode : operandList) {
             if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                atoms.add(
-                        new Java.AmbiguousName(
-                                Location.NOWHERE, new String[] {sqlIdentifier.getSimple()}));
+                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName}));
             } else if (sqlNode instanceof SqlLiteral) {
                 SqlLiteral sqlLiteral = (SqlLiteral) sqlNode;
                 String value = sqlLiteral.getValue().toString();

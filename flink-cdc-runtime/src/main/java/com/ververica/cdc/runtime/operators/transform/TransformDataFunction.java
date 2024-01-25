@@ -127,19 +127,18 @@ public class TransformDataFunction extends AbstractStreamOperator<Event>
             }
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
         }
-        applyNewSchema(tableId, newSchema);
+        transformSchema(tableId, newSchema);
         tableInfoMap.put(tableId, TableInfo.of(newSchema));
         return event;
     }
 
-    private void applyNewSchema(TableId tableId, Schema schema) {
-        tableInfoMap.put(tableId, TableInfo.of(schema));
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> route : transforms) {
-            Selectors selectors = route.f0;
+    private void transformSchema(TableId tableId, Schema schema) {
+        for (Tuple4<Selectors, Projector, RowFilter, Boolean> transform : transforms) {
+            Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId)) {
-                Projector projector = route.f1;
-                // update the columns of projection
-                projector.applyNewSchema(schema);
+                Projector projector = transform.f1;
+                // update the columns of projection and add the column of projection into Schema
+                projector.applySchemaChangeEvent(schema);
             }
         }
     }

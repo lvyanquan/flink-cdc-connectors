@@ -20,7 +20,13 @@ import com.ververica.cdc.common.data.DecimalData;
 import com.ververica.cdc.common.data.LocalZonedTimestampData;
 import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
+import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.types.BinaryType;
 import com.ververica.cdc.common.types.DataType;
+import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.common.types.VarBinaryType;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.math.BigDecimal;
@@ -31,6 +37,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /** A data type converter. */
@@ -39,6 +46,12 @@ public class DataTypeConverter {
     static final long MILLISECONDS_PER_SECOND = TimeUnit.SECONDS.toMillis(1);
     static final long NANOSECONDS_PER_MILLISECOND = TimeUnit.MILLISECONDS.toNanos(1);
     static final long NANOSECONDS_PER_DAY = TimeUnit.DAYS.toNanos(1);
+
+    public static RowType toRowType(List<Column> columnList) {
+        DataType[] dataTypes = columnList.stream().map(Column::getType).toArray(DataType[]::new);
+        String[] columnNames = columnList.stream().map(Column::getName).toArray(String[]::new);
+        return RowType.of(dataTypes, columnNames);
+    }
 
     public static Class<?> convertOriginalClass(DataType dataType) {
         switch (dataType.getTypeRoot()) {
@@ -100,7 +113,7 @@ public class DataTypeConverter {
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return SqlTypeName.TIMESTAMP;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
+                return SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
             case FLOAT:
                 return SqlTypeName.FLOAT;
             case DOUBLE:
@@ -121,6 +134,49 @@ public class DataTypeConverter {
             case MAP:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
+        }
+    }
+
+    public static DataType convertCalciteRelDataTypeToDataType(RelDataType relDataType) {
+        switch (relDataType.getSqlTypeName()) {
+            case BOOLEAN:
+                return DataTypes.BOOLEAN();
+            case TINYINT:
+                return DataTypes.TINYINT();
+            case SMALLINT:
+                return DataTypes.SMALLINT();
+            case INTEGER:
+                return DataTypes.INT();
+            case BIGINT:
+                return DataTypes.BIGINT();
+            case DATE:
+                return DataTypes.DATE();
+            case TIME:
+            case TIME_WITH_LOCAL_TIME_ZONE:
+                return DataTypes.TIME(relDataType.getPrecision());
+            case TIMESTAMP:
+                return DataTypes.TIMESTAMP(relDataType.getPrecision());
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return DataTypes.TIMESTAMP_LTZ(relDataType.getPrecision());
+            case FLOAT:
+                return DataTypes.FLOAT();
+            case DOUBLE:
+                return DataTypes.DOUBLE();
+            case CHAR:
+            case VARCHAR:
+                return DataTypes.STRING();
+            case BINARY:
+                return DataTypes.BINARY(BinaryType.MAX_LENGTH);
+            case VARBINARY:
+                return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
+            case DECIMAL:
+                return DataTypes.DECIMAL(relDataType.getPrecision(), relDataType.getScale());
+            case ROW:
+            case ARRAY:
+            case MAP:
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported type: " + relDataType.getSqlTypeName());
         }
     }
 

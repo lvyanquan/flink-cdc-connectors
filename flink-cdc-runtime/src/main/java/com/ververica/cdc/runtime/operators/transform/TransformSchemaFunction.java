@@ -48,6 +48,8 @@ public class TransformSchemaFunction extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
 
+    private final Map<TableId, TableInfo> originalTableInfoMap;
+
     public static TransformSchemaFunction.Builder newBuilder() {
         return new TransformSchemaFunction.Builder();
     }
@@ -70,6 +72,7 @@ public class TransformSchemaFunction extends AbstractStreamOperator<Event>
     private TransformSchemaFunction(List<Tuple2<String, String>> transformRules) {
         this.transformRules = transformRules;
         this.tableInfoMap = new ConcurrentHashMap<>();
+        this.originalTableInfoMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -109,29 +112,37 @@ public class TransformSchemaFunction extends AbstractStreamOperator<Event>
 
     private SchemaChangeEvent cacheLatestSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
+        Schema originalSchema;
         Schema newSchema;
         if (event instanceof CreateTableEvent) {
+            CreateTableEvent createTableEvent = (CreateTableEvent) event;
+            originalSchema = createTableEvent.getSchema();
+            event = transformCreateTableEvent(createTableEvent);
             newSchema = ((CreateTableEvent) event).getSchema();
-            event = transformCreateTableEvent((CreateTableEvent) event);
         } else {
+            TableInfo originalTableInfo = originalTableInfoMap.get(tableId);
+            if (originalTableInfo == null) {
+                throw new RuntimeException("Original Schema of " + tableId + " is not existed.");
+            }
             TableInfo tableInfo = tableInfoMap.get(tableId);
             if (tableInfo == null) {
                 throw new RuntimeException("Schema of " + tableId + " is not existed.");
             }
+            originalSchema =
+                    SchemaUtils.applySchemaChangeEvent(originalTableInfo.getSchema(), event);
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
-            applyNewSchema(tableId, newSchema);
         }
+        originalTableInfoMap.put(tableId, TableInfo.of(originalSchema));
         tableInfoMap.put(tableId, TableInfo.of(newSchema));
         return event;
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        tableInfoMap.put(tableId, TableInfo.of(createTableEvent.getSchema()));
-        for (Tuple2<Selectors, Projector> route : transforms) {
-            Selectors selectors = route.f0;
+        for (Tuple2<Selectors, Projector> transform : transforms) {
+            Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId)) {
-                Projector projector = route.f1;
+                Projector projector = transform.f1;
                 // update the columns of projection and add the column of projection into Schema
                 return projector.applyCreateTableEvent(createTableEvent);
             }
@@ -139,22 +150,9 @@ public class TransformSchemaFunction extends AbstractStreamOperator<Event>
         return createTableEvent;
     }
 
-    private void applyNewSchema(TableId tableId, Schema schema) {
-        tableInfoMap.put(tableId, TableInfo.of(schema));
-        for (Tuple2<Selectors, Projector> route : transforms) {
-            Selectors selectors = route.f0;
-            if (selectors.isMatch(tableId)) {
-                Projector projector = route.f1;
-                // update the columns of projection
-                projector.applyNewSchema(schema);
-            }
-        }
-    }
-
     private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent) {
         Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
         TableId tableId = dataChangeEvent.tableId();
-
         for (Tuple2<Selectors, Projector> transform : transforms) {
             Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId)) {
@@ -174,13 +172,17 @@ public class TransformSchemaFunction extends AbstractStreamOperator<Event>
         if (before != null) {
             BinaryRecordData data =
                     projector.recordFillDataField(
-                            before, tableInfoMap.get(dataChangeEvent.tableId()));
+                            before,
+                            originalTableInfoMap.get(dataChangeEvent.tableId()),
+                            tableInfoMap.get(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
         }
         if (after != null) {
             BinaryRecordData data =
                     projector.recordFillDataField(
-                            after, tableInfoMap.get(dataChangeEvent.tableId()));
+                            after,
+                            originalTableInfoMap.get(dataChangeEvent.tableId()),
+                            tableInfoMap.get(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
         }
         return Optional.of(dataChangeEvent);

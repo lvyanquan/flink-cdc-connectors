@@ -21,126 +21,64 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
-import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** The Projector applies to describe the projection of filtering tables. */
 public class Projector {
     private String projection;
-    private final int includeAllSourceColumnIndex;
-    private final List<ColumnTransform> columnTransformList;
-    private List<Column> allColumnList;
-    private BinaryRecordDataGenerator recordDataGenerator;
+    private List<ColumnTransform> columnTransformList;
 
-    public Projector(
-            String projection,
-            int includeAllSourceColumnIndex,
-            List<ColumnTransform> columnTransformList,
-            BinaryRecordDataGenerator recordDataGenerator) {
+    public Projector(String projection, List<ColumnTransform> columnTransformList) {
         this.projection = projection;
-        this.includeAllSourceColumnIndex = includeAllSourceColumnIndex;
         this.columnTransformList = columnTransformList;
-        this.recordDataGenerator = recordDataGenerator;
-        this.allColumnList = getAllColumnList(new ArrayList<>());
-    }
-
-    public BinaryRecordDataGenerator getRecordDataGenerator() {
-        return recordDataGenerator;
     }
 
     public boolean isVaild() {
-        // (projection.length() == 1 && includeAllSourceColumnIndex == 0): only star. Only star is
-        // invalid.
-        return !StringUtils.isNullOrWhitespaceOnly(projection)
-                && !(projection.length() == 1 && includeAllSourceColumnIndex == 0);
+        return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
 
-    private static Projector of(
-            String projection,
-            int includeAllSourceColumnIndex,
-            List<ColumnTransform> columnTransformList,
-            BinaryRecordDataGenerator recordDataGenerator) {
-        return new Projector(
-                projection, includeAllSourceColumnIndex, columnTransformList, recordDataGenerator);
-    }
-
-    private static RowType toRowType(List<Column> columnList) {
-        DataType[] dataTypes = columnList.stream().map(Column::getType).toArray(DataType[]::new);
-        String[] columnNames = columnList.stream().map(Column::getName).toArray(String[]::new);
-        return RowType.of(dataTypes, columnNames);
+    private static Projector of(String projection, List<ColumnTransform> columnTransformList) {
+        return new Projector(projection, columnTransformList);
     }
 
     public static Projector generateProjector(String projection) {
         if (StringUtils.isNullOrWhitespaceOnly(projection)) {
             return null;
         }
-        List<ColumnTransform> columnTransformList =
-                FlinkSqlParser.generateColumnTransforms(projection);
-        int includeAllSourceColumnIndex = -1;
-        // convert columnTransform named `*` into the flag of includeAllSourceColumn
-        for (int i = 0; i < columnTransformList.size(); i++) {
-            // the column name of star is ""
-            if (columnTransformList.get(i).getColumnName().equals("")) {
-                includeAllSourceColumnIndex = i;
-                columnTransformList.remove(includeAllSourceColumnIndex);
-                break;
-            }
-        }
-        return of(projection, includeAllSourceColumnIndex, columnTransformList, null);
+        return of(projection, new ArrayList<>());
     }
 
-    private boolean includeAllSourceColumn() {
-        return includeAllSourceColumnIndex > -1;
-    }
-
-    private List<Column> getAllColumnList(List<Column> columns) {
-        List<Column> allColumnList = new ArrayList<>();
-        columnTransformList.forEach(
-                columnTransform -> {
-                    allColumnList.add(columnTransform.getColumn());
-                });
-        List<Column> sourceColumnList = new ArrayList<>();
-        columns.forEach(
-                column -> {
-                    boolean isDuplicate = false;
-                    for (ColumnTransform columnTransform : columnTransformList) {
-                        if (columnTransform.getColumnName().equals(column.getName())) {
-                            isDuplicate = true;
-                            break;
-                        }
-                    }
-                    if (!isDuplicate) {
-                        sourceColumnList.add(column);
-                    }
-                });
-        if (includeAllSourceColumn()) {
-            allColumnList.addAll(includeAllSourceColumnIndex, sourceColumnList);
-        }
-        return allColumnList;
+    private List<Column> getAllColumnList() {
+        return columnTransformList.stream()
+                .map(ColumnTransform::getColumn)
+                .collect(Collectors.toList());
     }
 
     public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
-        applyNewSchema(createTableEvent.getSchema());
+        columnTransformList =
+                FlinkSqlParser.generateColumnTransforms(
+                        projection, createTableEvent.getSchema().getColumns());
+        List<Column> allColumnList = getAllColumnList();
         // add the column of projection into Schema
         Schema schema = createTableEvent.getSchema().copy(allColumnList);
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
-    public void applyNewSchema(Schema schema) {
-        allColumnList = getAllColumnList(schema.getColumns());
-        recordDataGenerator = new BinaryRecordDataGenerator(toRowType(allColumnList));
+    public void applySchemaChangeEvent(Schema schema) {
+        columnTransformList =
+                FlinkSqlParser.generateColumnTransforms(projection, schema.getColumns());
     }
 
-    public BinaryRecordData recordFillDataField(BinaryRecordData data, TableInfo tableInfo) {
+    public BinaryRecordData recordFillDataField(
+            BinaryRecordData data, TableInfo originalTableInfo, TableInfo tableInfo) {
         List<Object> valueList = new ArrayList<>();
-        for (Column column : allColumnList) {
+        for (Column column : tableInfo.getSchema().getColumns()) {
             boolean isColumnTransform = false;
             for (ColumnTransform columnTransform : columnTransformList) {
                 if (column.getName().equals(columnTransform.getColumnName())
@@ -151,15 +89,18 @@ public class Projector {
                 }
             }
             if (!isColumnTransform) {
-                valueList.add(getValueFromBinaryRecordData(column.getName(), data, tableInfo));
+                valueList.add(
+                        getValueFromBinaryRecordData(column.getName(), data, originalTableInfo));
             }
         }
-        return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
+        return tableInfo
+                .getRecordDataGenerator()
+                .generate(valueList.toArray(new Object[valueList.size()]));
     }
 
     public BinaryRecordData recordData(BinaryRecordData after, TableInfo tableInfo) {
         List<Object> valueList = new ArrayList<>();
-        for (Column column : allColumnList) {
+        for (Column column : tableInfo.getSchema().getColumns()) {
             boolean isColumnTransform = false;
             for (ColumnTransform columnTransform : columnTransformList) {
                 if (column.getName().equals(columnTransform.getColumnName())
@@ -176,7 +117,9 @@ public class Projector {
                 valueList.add(getValueFromBinaryRecordData(column.getName(), after, tableInfo));
             }
         }
-        return getRecordDataGenerator().generate(valueList.toArray(new Object[valueList.size()]));
+        return tableInfo
+                .getRecordDataGenerator()
+                .generate(valueList.toArray(new Object[valueList.size()]));
     }
 
     private Object getValueFromBinaryRecordData(
