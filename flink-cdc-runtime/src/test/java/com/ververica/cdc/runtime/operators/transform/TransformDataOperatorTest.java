@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-/** Unit tests for the {@link TransformDataFunction}. */
-public class TransformDataFunctionTest {
+/** Unit tests for the {@link TransformDataOperator}. */
+public class TransformDataOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -68,14 +68,14 @@ public class TransformDataFunctionTest {
 
     @Test
     void testDataChangeEventTransform() throws Exception {
-        TransformDataFunction transform =
-                TransformDataFunction.newBuilder()
+        TransformDataOperator transform =
+                TransformDataOperator.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "*, concat(col1,col2) col12",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<TransformDataFunction, Event>
+        EventOperatorTestHarness<TransformDataOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -157,11 +157,11 @@ public class TransformDataFunctionTest {
 
     @Test
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
-        TransformDataFunction transform =
-                TransformDataFunction.newBuilder()
+        TransformDataOperator transform =
+                TransformDataOperator.newBuilder()
                         .addTransform(DATATYPE_TABLEID.identifier(), "*", null)
                         .build();
-        EventOperatorTestHarness<TransformDataFunction, Event>
+        EventOperatorTestHarness<TransformDataOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization

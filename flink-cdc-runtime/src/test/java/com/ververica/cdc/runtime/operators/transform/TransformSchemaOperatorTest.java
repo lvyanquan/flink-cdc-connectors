@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-/** Unit tests for the {@link TransformSchemaFunction}. */
-public class TransformSchemaFunctionTest {
+/** Unit tests for the {@link TransformSchemaOperator}. */
+public class TransformSchemaOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -63,18 +63,18 @@ public class TransformSchemaFunctionTest {
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("col2", DataTypes.STRING())
-                    .physicalColumn("col3", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
+                    .physicalColumn("col3", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
 
     @Test
     void testEventTransform() throws Exception {
-        TransformSchemaFunction transform =
-                TransformSchemaFunction.newBuilder()
+        TransformSchemaOperator transform =
+                TransformSchemaOperator.newBuilder()
                         .addTransform(CUSTOMERS_TABLEID.identifier(), "*, concat(col1,col2) col12")
                         .build();
-        EventOperatorTestHarness<TransformSchemaFunction, Event>
+        EventOperatorTestHarness<TransformSchemaOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization

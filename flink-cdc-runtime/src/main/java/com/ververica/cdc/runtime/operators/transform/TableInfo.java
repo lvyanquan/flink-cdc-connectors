@@ -26,17 +26,24 @@ import java.util.List;
 
 /** The TableInfo applies to cache schema and fieldGetters. */
 public class TableInfo {
+    private String name;
     private Schema schema;
     private RecordData.FieldGetter[] fieldGetters;
     private BinaryRecordDataGenerator recordDataGenerator;
 
     public TableInfo(
+            String name,
             Schema schema,
             RecordData.FieldGetter[] fieldGetters,
             BinaryRecordDataGenerator recordDataGenerator) {
+        this.name = name;
         this.schema = schema;
         this.fieldGetters = fieldGetters;
         this.recordDataGenerator = recordDataGenerator;
+    }
+
+    public String getName() {
+        return name;
     }
 
     public Schema getSchema() {
@@ -51,12 +58,15 @@ public class TableInfo {
         return recordDataGenerator;
     }
 
-    public static TableInfo of(Schema schema) {
+    public static TableInfo of(String name, Schema schema) {
         List<RecordData.FieldGetter> fieldGetters =
                 SchemaUtils.createFieldGetters(schema.getColumns());
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(DataTypeConverter.toRowType(schema.getColumns()));
         return new TableInfo(
-                schema, fieldGetters.toArray(new RecordData.FieldGetter[0]), recordDataGenerator);
+                name,
+                schema,
+                fieldGetters.toArray(new RecordData.FieldGetter[0]),
+                recordDataGenerator);
     }
 }

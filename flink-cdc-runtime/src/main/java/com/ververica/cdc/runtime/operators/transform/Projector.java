@@ -39,7 +39,7 @@ public class Projector {
         this.columnTransformList = columnTransformList;
     }
 
-    public boolean isVaild() {
+    public boolean isValid() {
         return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
 

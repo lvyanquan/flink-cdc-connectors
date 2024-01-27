@@ -121,18 +121,16 @@ public class FlinkSqlParser {
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
         SqlNode validateSqlNode = validator.validate(sqlNode);
-        HepProgramBuilder builder = new HepProgramBuilder();
-        HepPlanner planner = new HepPlanner(builder.build());
-        RelOptCluster cluster = RelOptCluster.create(planner, new RexBuilder(factory));
-        SqlToRelConverter.Config config = SqlToRelConverter.config().withTrimUnusedFields(false);
         SqlToRelConverter sqlToRelConverter =
                 new SqlToRelConverter(
                         null,
                         validator,
                         calciteCatalogReader,
-                        cluster,
+                        RelOptCluster.create(
+                                new HepPlanner(new HepProgramBuilder().build()),
+                                new RexBuilder(factory)),
                         StandardConvertletTable.INSTANCE,
-                        config);
+                        SqlToRelConverter.config().withTrimUnusedFields(false));
         RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
         return relRoot.rel;
     }

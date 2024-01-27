@@ -18,6 +18,7 @@ package com.ververica.cdc.runtime.operators.transform;
 
 import org.apache.flink.table.runtime.generated.CompileUtils;
 
+import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
@@ -25,6 +26,8 @@ import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -32,6 +35,7 @@ import java.util.List;
 
 /** The RowFilter applies to describe the row filter of filtering tables. */
 public class RowFilter {
+    private static final Logger LOG = LoggerFactory.getLogger(RowFilter.class);
     private final String expression;
     private final String scriptExpression;
     private final List<String> columnNames;
@@ -62,11 +66,12 @@ public class RowFilter {
         List<Column> columns = tableInfo.getSchema().getColumns();
         List<Object> params = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
         for (int i = 0; i < columns.size(); i++) {
             if (columnNames.contains(columns.get(i).getName())) {
                 params.add(
                         DataTypeConverter.convertToOriginal(
-                                after.getString(i), columns.get(i).getType()));
+                                fieldGetters[i].getFieldOrNull(after), columns.get(i).getType()));
                 paramTypes.add(DataTypeConverter.convertOriginalClass(columns.get(i).getType()));
             }
         }
@@ -81,6 +86,12 @@ public class RowFilter {
         try {
             return (Boolean) expressionEvaluator.evaluate(params.toArray());
         } catch (InvocationTargetException e) {
+            LOG.error(
+                    "Table:{} column:{} projection:{} execute failed. {}",
+                    tableInfo.getName(),
+                    columnNames,
+                    expression,
+                    e);
             e.printStackTrace();
         }
         return true;

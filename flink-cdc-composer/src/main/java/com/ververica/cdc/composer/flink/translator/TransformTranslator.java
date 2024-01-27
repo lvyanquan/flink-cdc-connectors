@@ -20,13 +20,13 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.composer.definition.TransformDef;
-import com.ververica.cdc.runtime.operators.transform.TransformDataFunction;
-import com.ververica.cdc.runtime.operators.transform.TransformSchemaFunction;
+import com.ververica.cdc.runtime.operators.transform.TransformDataOperator;
+import com.ververica.cdc.runtime.operators.transform.TransformSchemaOperator;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
 import java.util.List;
 
-/** Translator for transform. */
+/** Translator for transform schema. */
 public class TransformTranslator {
 
     public DataStream<Event> translateSchema(
@@ -35,8 +35,8 @@ public class TransformTranslator {
             return input;
         }
 
-        TransformSchemaFunction.Builder transformSchemaFunctionBuilder =
-                TransformSchemaFunction.newBuilder();
+        TransformSchemaOperator.Builder transformSchemaFunctionBuilder =
+                TransformSchemaOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 transformSchemaFunctionBuilder.addTransform(
@@ -52,7 +52,7 @@ public class TransformTranslator {
             return input;
         }
 
-        TransformDataFunction.Builder transformFunctionBuilder = TransformDataFunction.newBuilder();
+        TransformDataOperator.Builder transformFunctionBuilder = TransformDataOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 transformFunctionBuilder.addTransform(
