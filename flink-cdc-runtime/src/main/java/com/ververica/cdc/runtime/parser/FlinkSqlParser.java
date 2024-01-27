@@ -187,6 +187,7 @@ public class FlinkSqlParser {
                                             columnName,
                                             DataTypeConverter.convertCalciteRelDataTypeToDataType(
                                                     relDataTypeMap.get(columnName)),
+                                            transform.toString(),
                                             JaninoParser.translateSqlNodeToJaninoExpression(
                                                     transform),
                                             parseColumnNameList(transform)));
@@ -199,6 +200,7 @@ public class FlinkSqlParser {
                                         columnName,
                                         DataTypeConverter.convertCalciteRelDataTypeToDataType(
                                                 relDataTypeMap.get(columnName)),
+                                        transform.toString(),
                                         JaninoParser.translateSqlNodeToJaninoExpression(transform),
                                         parseColumnNameList(transform)));
                     }

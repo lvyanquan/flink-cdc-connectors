@@ -18,6 +18,7 @@ package com.ververica.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 
+import com.ververica.cdc.common.utils.StringUtils;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -68,21 +69,35 @@ public class JaninoParser {
             SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "&&", atoms[1]);
+                return generateBinaryOperation(sqlBasicCall, atoms, "&&");
             case OR:
-                return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "||", atoms[1]);
+                return generateBinaryOperation(sqlBasicCall, atoms, "||");
+            case NOT:
+                return generateUnaryOperation("!", atoms[0]);
             case EQUALS:
                 return generateEqualsOperation(sqlBasicCall, atoms);
             case NOT_EQUALS:
-                return new Java.UnaryOperation(
-                        Location.NOWHERE, "!", generateEqualsOperation(sqlBasicCall, atoms));
+                return generateUnaryOperation("!", generateEqualsOperation(sqlBasicCall, atoms));
             case IS_NULL:
-                return new Java.UnaryOperation(Location.NOWHERE, "null == ", atoms[0]);
+                return generateUnaryOperation("null == ", atoms[0]);
             case IS_NOT_NULL:
-                return new Java.UnaryOperation(Location.NOWHERE, "null != ", atoms[0]);
+                return generateUnaryOperation("null != ", atoms[0]);
+            case IS_FALSE:
+            case IS_NOT_TRUE:
+                return generateUnaryOperation("false == ", atoms[0]);
+            case IS_TRUE:
+            case IS_NOT_FALSE:
+                return generateUnaryOperation("true == ", atoms[0]);
+            case BETWEEN:
+            case LIKE:
+            case CEIL:
+            case FLOOR:
             case OTHER_FUNCTION:
                 return new Java.MethodInvocation(
-                        Location.NOWHERE, null, sqlBasicCall.getOperator().getName(), atoms);
+                        Location.NOWHERE,
+                        null,
+                        StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                        atoms);
             case PLUS:
                 return generateBinaryOperation(sqlBasicCall, atoms, "+");
             case MINUS:
@@ -98,15 +113,21 @@ public class JaninoParser {
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
                 return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
+            case OTHER:
+                return generateOtherOperation(sqlBasicCall, atoms);
             default:
-                throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
+                throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
+    }
+
+    private static Java.Rvalue generateUnaryOperation(String operator, Java.Rvalue atom) {
+        return new Java.UnaryOperation(Location.NOWHERE, operator, atom);
     }
 
     private static Java.Rvalue generateBinaryOperation(
             SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, String operator) {
         if (atoms.length != 2) {
-            throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
         return new Java.BinaryOperation(Location.NOWHERE, atoms[0], operator, atoms[1]);
     }
@@ -114,7 +135,7 @@ public class JaninoParser {
     private static Java.Rvalue generateEqualsOperation(
             SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 2) {
-            throw new ParseException("Unrecognized filter: " + sqlBasicCall.toString());
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
         if (atoms[0] instanceof Java.AmbiguousName) {
             if (atoms[0].toString().contains("String.valueOf(")) {
@@ -126,5 +147,14 @@ public class JaninoParser {
             }
         }
         return new Java.BinaryOperation(Location.NOWHERE, atoms[0], "==", atoms[1]);
+    }
+
+    private static Java.Rvalue generateOtherOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (sqlBasicCall.getOperator().getName().equals("||")) {
+            return new Java.MethodInvocation(
+                    Location.NOWHERE, null, StringUtils.convertToCamelCase("CONCAT"), atoms);
+        }
+        throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
     }
 }

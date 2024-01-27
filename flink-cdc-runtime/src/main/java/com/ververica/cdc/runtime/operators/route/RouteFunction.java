@@ -27,6 +27,7 @@ import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.DropColumnEvent;
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
@@ -84,6 +85,9 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
 
     @Override
     public Event map(Event event) throws Exception {
+        if (event instanceof FlushEvent) {
+            return event;
+        }
         checkState(
                 event instanceof ChangeEvent,
                 String.format(

@@ -293,7 +293,7 @@ class FlinkPipelineComposerITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().replace("\r\n", "\n").split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, options=()}",

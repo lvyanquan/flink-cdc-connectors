@@ -47,7 +47,8 @@ public class TransformTranslator {
                 "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
     }
 
-    public DataStream<Event> translateData(DataStream<Event> input, List<TransformDef> transforms) {
+    public DataStream<Event> translateData(
+            DataStream<Event> input, List<TransformDef> transforms, int parallelism) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -62,6 +63,8 @@ public class TransformTranslator {
             }
         }
         return input.transform(
-                "Transform:Data", new EventTypeInfo(), transformFunctionBuilder.build());
+                        "Transform:Data", new EventTypeInfo(), transformFunctionBuilder.build())
+                .setParallelism(parallelism)
+                .forward();
     }
 }

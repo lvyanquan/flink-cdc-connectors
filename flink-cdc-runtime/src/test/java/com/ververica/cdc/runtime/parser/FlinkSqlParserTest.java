@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.runtime.parser;
 
+import org.apache.flink.table.api.ApiExpression;
+import org.apache.flink.table.api.Expressions;
 import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
 
 import com.ververica.cdc.common.schema.Schema;
@@ -191,10 +193,28 @@ public class FlinkSqlParserTest {
         testFilterExpression("id is null", "null == id");
         testFilterExpression("id = 1 and uid = 2", "id == 1 && uid == 2");
         testFilterExpression("id = 1 or id = 2", "id == 1 || id == 2");
+        testFilterExpression("not (id = 1)", "!id == 1");
         testFilterExpression("id = '1'", "String.valueOf('1').equals(id)");
         testFilterExpression("id <> '1'", "!String.valueOf('1').equals(id)");
+        testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
+        testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
+        testFilterExpression("id is false", "false == id");
+        testFilterExpression("id is not false", "true == id");
+        testFilterExpression("id is true", "true == id");
+        testFilterExpression("id is not true", "false == id");
+        testFilterExpression("a || b", "concat(a, b)");
         testFilterExpression("upper(id)", "upper(id)");
+        testFilterExpression("lower(id)", "lower(id)");
         testFilterExpression("concat(a,b)", "concat(a, b)");
+        testFilterExpression("SUBSTRING(a,1)", "substring(a, 1)");
+        testFilterExpression("id like '^[a-zA-Z]'", "like(id, String.valueOf('^[a-zA-Z]'))");
+        testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, String.valueOf('^[a-zA-Z]'))");
+        testFilterExpression("power(2,2)", "power(2, 2)");
+        testFilterExpression("asb(2)", "asb(2)");
+        testFilterExpression("ceil(2)", "ceil(2)");
+        testFilterExpression("floor(2)", "floor(2)");
+        testFilterExpression("round(2,2)", "round(2, 2)");
+        testFilterExpression("uuid()", "uuid()");
         testFilterExpression("id + 2", "id + 2");
         testFilterExpression("id - 2", "id - 2");
         testFilterExpression("id * 2", "id * 2");
@@ -207,6 +227,13 @@ public class FlinkSqlParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null", "abs(uniq_id) > 10 && null != id");
+    }
+
+    @Test
+    public void testSqlCall() {
+        ApiExpression apiExpression = Expressions.concat("1", "2");
+        ApiExpression substring = apiExpression.substring(1);
+        System.out.println(substring);
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {

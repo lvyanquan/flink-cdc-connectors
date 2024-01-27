@@ -105,13 +105,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
         TransformTranslator transformTranslator = new TransformTranslator();
         stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
 
-        // Transform Data
-        stream = transformTranslator.translateData(stream, pipelineDef.getTransforms());
-
-        // Route
-        RouteTranslator routeTranslator = new RouteTranslator();
-        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
-
         // Create sink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
@@ -133,6 +126,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
         stream =
                 partitioningTranslator.translate(
                         stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
+
+        // Transform Data
+        stream =
+                transformTranslator.translateData(stream, pipelineDef.getTransforms(), parallelism);
+
+        // Route
+        RouteTranslator routeTranslator = new RouteTranslator();
+        stream = routeTranslator.translate(stream, pipelineDef.getRoute(), parallelism);
 
         // Sink
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();

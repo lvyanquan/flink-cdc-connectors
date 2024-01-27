@@ -26,6 +26,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
@@ -103,7 +104,9 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof SchemaChangeEvent) {
+        if (event instanceof FlushEvent) {
+            output.collect(new StreamRecord<>(event));
+        } else if (event instanceof SchemaChangeEvent) {
             event = cacheSchema((SchemaChangeEvent) event);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {

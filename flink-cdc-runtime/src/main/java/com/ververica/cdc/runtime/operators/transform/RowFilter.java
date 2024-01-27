@@ -86,15 +86,9 @@ public class RowFilter {
         try {
             return (Boolean) expressionEvaluator.evaluate(params.toArray());
         } catch (InvocationTargetException e) {
-            LOG.error(
-                    "Table:{} column:{} projection:{} execute failed. {}",
-                    tableInfo.getName(),
-                    columnNames,
-                    expression,
-                    e);
-            e.printStackTrace();
+            LOG.error("Table:{} filter:{} execute failed. {}", tableInfo.getName(), expression, e);
+            throw new RuntimeException(e);
         }
-        return true;
     }
 
     public boolean isVaild() {

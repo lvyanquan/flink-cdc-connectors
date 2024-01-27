@@ -26,6 +26,8 @@ import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
@@ -34,13 +36,19 @@ import java.util.List;
 
 /** The ColumnTransform applies to describe the information of the transformation column. */
 public class ColumnTransform implements Serializable {
+    private static final Logger LOG = LoggerFactory.getLogger(ColumnTransform.class);
     private final Column column;
+    private final String expression;
     private final String scriptExpression;
     private final List<String> originalColumnNames;
 
     public ColumnTransform(
-            Column column, String scriptExpression, List<String> originalColumnNames) {
+            Column column,
+            String expression,
+            String scriptExpression,
+            List<String> originalColumnNames) {
         this.column = column;
+        this.expression = expression;
         this.scriptExpression = scriptExpression;
         this.originalColumnNames = originalColumnNames;
     }
@@ -87,20 +95,30 @@ public class ColumnTransform implements Serializable {
         try {
             return expressionEvaluator.evaluate(params.toArray());
         } catch (InvocationTargetException e) {
+            LOG.error(
+                    "Table:{} column:{} projection:{} execute failed. {}",
+                    tableInfo.getName(),
+                    column.getName(),
+                    expression,
+                    e);
             throw new RuntimeException(e);
         }
     }
 
     public static ColumnTransform of(String columnName, DataType dataType) {
-        return new ColumnTransform(Column.physicalColumn(columnName, dataType), null, null);
+        return new ColumnTransform(Column.physicalColumn(columnName, dataType), null, null, null);
     }
 
     public static ColumnTransform of(
             String columnName,
             DataType dataType,
+            String expression,
             String scriptExpression,
             List<String> originalColumnNames) {
         return new ColumnTransform(
-                Column.physicalColumn(columnName, dataType), scriptExpression, originalColumnNames);
+                Column.physicalColumn(columnName, dataType),
+                expression,
+                scriptExpression,
+                originalColumnNames);
     }
 }

@@ -28,7 +28,8 @@ import java.util.List;
 
 /** Translator for router. */
 public class RouteTranslator {
-    public DataStream<Event> translate(DataStream<Event> input, List<RouteDef> routes) {
+    public DataStream<Event> translate(
+            DataStream<Event> input, List<RouteDef> routes, int parallelism) {
         if (routes.isEmpty()) {
             return input;
         }
@@ -37,6 +38,8 @@ public class RouteTranslator {
             routeFunctionBuilder.addRoute(
                     route.getSourceTable(), TableId.parse(route.getSinkTable()));
         }
-        return input.map(routeFunctionBuilder.build(), new EventTypeInfo()).name("Route");
+        return input.map(routeFunctionBuilder.build(), new EventTypeInfo())
+                .setParallelism(parallelism)
+                .name("Route");
     }
 }
