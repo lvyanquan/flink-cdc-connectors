@@ -17,6 +17,7 @@
 package com.ververica.cdc.runtime.operators.transform;
 
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -26,24 +27,36 @@ import java.util.List;
 
 /** The TableInfo applies to cache schema and fieldGetters. */
 public class TableInfo {
-    private String name;
+    private TableId tableId;
     private Schema schema;
     private RecordData.FieldGetter[] fieldGetters;
     private BinaryRecordDataGenerator recordDataGenerator;
 
     public TableInfo(
-            String name,
+            TableId tableId,
             Schema schema,
             RecordData.FieldGetter[] fieldGetters,
             BinaryRecordDataGenerator recordDataGenerator) {
-        this.name = name;
+        this.tableId = tableId;
         this.schema = schema;
         this.fieldGetters = fieldGetters;
         this.recordDataGenerator = recordDataGenerator;
     }
 
     public String getName() {
-        return name;
+        return tableId.identifier();
+    }
+
+    public String getTableName() {
+        return tableId.getTableName();
+    }
+
+    public String getSchemaName() {
+        return tableId.getSchemaName();
+    }
+
+    public TableId getTableId() {
+        return tableId;
     }
 
     public Schema getSchema() {
@@ -58,13 +71,13 @@ public class TableInfo {
         return recordDataGenerator;
     }
 
-    public static TableInfo of(String name, Schema schema) {
+    public static TableInfo of(TableId tableId, Schema schema) {
         List<RecordData.FieldGetter> fieldGetters =
                 SchemaUtils.createFieldGetters(schema.getColumns());
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(DataTypeConverter.toRowType(schema.getColumns()));
         return new TableInfo(
-                name,
+                tableId,
                 schema,
                 fieldGetters.toArray(new RecordData.FieldGetter[0]),
                 recordDataGenerator);

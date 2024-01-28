@@ -24,14 +24,26 @@ import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /** Use Janino parser to parse the statement of flink cdc pipeline transform. */
 public class JaninoParser {
+
+    private static final List<SqlTypeName> SQL_TYPE_NAME_IGNORE = Arrays.asList(SqlTypeName.SYMBOL);
+    private static final List<String> SQL_NAME_CALL_FUNCTION =
+            Arrays.asList(
+                    "LOCALTIME",
+                    "LOCALTIMESTAMP",
+                    "CURRENT_TIME",
+                    "CURRENT_DATE",
+                    "CURRENT_TIMESTAMP");
 
     public static String loadSystemFunction(String expression) {
         return "import static com.ververica.cdc.runtime.functions.SystemFunctionUtils.*;"
@@ -47,22 +59,42 @@ public class JaninoParser {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
-            if (sqlNode instanceof SqlIdentifier) {
-                SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-                atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName}));
-            } else if (sqlNode instanceof SqlLiteral) {
-                SqlLiteral sqlLiteral = (SqlLiteral) sqlNode;
-                String value = sqlLiteral.getValue().toString();
-                if (sqlLiteral instanceof SqlCharStringLiteral) {
-                    value = "String.valueOf(" + value + ")";
-                }
-                atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {value}));
-            } else if (sqlNode instanceof SqlBasicCall) {
-                atoms.add(translateJaninoAST((SqlBasicCall) sqlNode));
-            }
+            translateSqlNodeToAtoms(sqlNode, atoms);
         }
         return sqlBasicCallToJaninoRvalue(sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
+    }
+
+    private static void translateSqlNodeToAtoms(SqlNode sqlNode, List<Java.Rvalue> atoms) {
+        if (sqlNode instanceof SqlIdentifier) {
+            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+            String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+            if (SQL_NAME_CALL_FUNCTION.contains(columnName)) {
+                atoms.add(
+                        new Java.MethodInvocation(
+                                Location.NOWHERE,
+                                null,
+                                StringUtils.convertToCamelCase(columnName),
+                                new Java.Rvalue[0]));
+            } else {
+                atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName}));
+            }
+        } else if (sqlNode instanceof SqlLiteral) {
+            SqlLiteral sqlLiteral = (SqlLiteral) sqlNode;
+            String value = sqlLiteral.getValue().toString();
+            if (sqlLiteral instanceof SqlCharStringLiteral) {
+                value = "String.valueOf(" + value + ")";
+            }
+            if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
+                value = "'" + value + "'";
+            }
+            atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {value}));
+        } else if (sqlNode instanceof SqlBasicCall) {
+            atoms.add(translateJaninoAST((SqlBasicCall) sqlNode));
+        } else if (sqlNode instanceof SqlNodeList) {
+            for (SqlNode node : (SqlNodeList) sqlNode) {
+                translateSqlNodeToAtoms(node, atoms);
+            }
+        }
     }
 
     private static Java.Rvalue sqlBasicCallToJaninoRvalue(
@@ -89,9 +121,12 @@ public class JaninoParser {
             case IS_NOT_FALSE:
                 return generateUnaryOperation("true == ", atoms[0]);
             case BETWEEN:
+            case IN:
+            case NOT_IN:
             case LIKE:
             case CEIL:
             case FLOOR:
+            case TRIM:
             case OTHER_FUNCTION:
                 return new Java.MethodInvocation(
                         Location.NOWHERE,

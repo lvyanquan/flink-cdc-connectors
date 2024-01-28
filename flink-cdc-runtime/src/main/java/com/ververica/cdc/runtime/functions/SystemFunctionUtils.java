@@ -24,7 +24,17 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.WeekFields;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.apache.flink.table.data.DecimalDataUtils.doubleValue;
@@ -32,6 +42,108 @@ import static org.apache.flink.table.data.DecimalDataUtils.doubleValue;
 /** System function utils to support the call of flink cdc pipeline transform. */
 public class SystemFunctionUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
+
+    public static long localtime() {
+        return LocalTime.now().toSecondOfDay();
+    }
+
+    public static long localtimestamp() {
+        return Instant.now().toEpochMilli();
+    }
+
+    public static long currentTime() {
+        return localtime();
+    }
+
+    public static long currentDate() {
+        return LocalDate.now().toEpochDay();
+    }
+
+    public static long currentTimestamp() {
+        return localtimestamp();
+    }
+
+    public static long now() {
+        return localtimestamp();
+    }
+
+    public static int year(long date) {
+        return LocalDate.ofEpochDay(date).getYear();
+    }
+
+    public static int quarter(long date) {
+        return (LocalDate.ofEpochDay(date).getMonthValue() - 1) / 3 + 1;
+    }
+
+    public static int month(long date) {
+        return LocalDate.ofEpochDay(date).getMonthValue();
+    }
+
+    public static int week(long date) {
+        LocalDate localDate = LocalDate.ofEpochDay(date);
+        WeekFields weekFields = WeekFields.ISO;
+        return localDate.get(weekFields.weekOfWeekBasedYear());
+    }
+
+    public static String dateFormat(long date, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        return dateFormat.format(new Date(date));
+    }
+
+    public static int toDate(String str) {
+        return toDate(str, "yyyy-MM-dd");
+    }
+
+    public static int toDate(String str, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        try {
+            return dateFormat.parse(str).getDay();
+        } catch (ParseException e) {
+            LOG.error("Unsupported date type convert: {}", str);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static long toTimestamp(String str) {
+        return toTimestamp(str, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    public static long toTimestamp(String str, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        try {
+            return dateFormat.parse(str).getTime();
+        } catch (ParseException e) {
+            LOG.error("Unsupported date type convert: {}", str);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static long timestampDiff(String symbol, long fromDate, long toDate) {
+        Calendar from = Calendar.getInstance();
+        from.setTime(new Date(fromDate));
+        Calendar to = Calendar.getInstance();
+        to.setTime(new Date(toDate));
+        long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
+        switch (symbol) {
+            case "SECOND":
+                return second;
+            case "MINUTE":
+                return second / 60;
+            case "HOUR":
+                return second / 3600;
+            case "DAY":
+                return second / (24 * 3600);
+            case "MONTH":
+                return to.get(Calendar.YEAR) * 12
+                        + to.get(Calendar.MONDAY)
+                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONDAY));
+            case "YEAR":
+                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
+            default:
+                LOG.error("Unsupported timestamp diff: {}", symbol);
+                throw new RuntimeException("Unsupported timestamp diff: " + symbol);
+        }
+    }
 
     // todo: Improve the comparison of various types.
     public static boolean betweenAsymmetric(Object value, Object minValue, Object maxValue) {
@@ -51,6 +163,43 @@ public class SystemFunctionUtils {
 
     public static boolean notBetweenAsymmetric(Object value, Object minValue, Object maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean in(String value, String... str) {
+        return Arrays.stream(str).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean notIn(String value, String... str) {
+        return !notIn(value, str);
+    }
+
+    public static int charLength(String str) {
+        return str.length();
+    }
+
+    public static String trim(String symbol, String target, String str) {
+        return str.trim();
+    }
+
+    /**
+     * Returns a string resulting from replacing all substrings that match the regular expression
+     * with replacement.
+     */
+    public static String regexpReplace(String str, String regex, String replacement) {
+        if (str == null || regex == null || replacement == null) {
+            return null;
+        }
+        try {
+            return str.replaceAll(regex, Matcher.quoteReplacement(replacement));
+        } catch (Exception e) {
+            LOG.error(
+                    String.format(
+                            "Exception in regexpReplace('%s', '%s', '%s')",
+                            str, regex, replacement),
+                    e);
+            // return null if exception in regex replace
+            return null;
+        }
     }
 
     public static String concat(String... str) {
@@ -270,5 +419,77 @@ public class SystemFunctionUtils {
 
     public static String uuid(byte[] b) {
         return UUID.nameUUIDFromBytes(b).toString();
+    }
+
+    public static String nullif(String str1, String str2) {
+        if (str1 == null && str2 == null) {
+            return null;
+        }
+        if (str1 == null) {
+            return str2;
+        }
+        if (str2 == null) {
+            return str1;
+        }
+        return str1.equals(str2) ? null : str1;
+    }
+
+    public static Integer nullif(int numeric1, int numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static Long nullif(long numeric1, long numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static Float nullif(float numeric1, float numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static Double nullif(double numeric1, double numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static Short nullif(short numeric1, short numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static Byte nullif(byte numeric1, byte numeric2) {
+        return numeric1 == numeric2 ? null : numeric1;
+    }
+
+    public static BigDecimal nullif(BigDecimal numeric1, BigDecimal numeric2) {
+        if (numeric1 == null && numeric2 == null) {
+            return null;
+        }
+        if (numeric1 == null) {
+            return numeric2;
+        }
+        if (numeric2 == null) {
+            return numeric1;
+        }
+        return numeric1.equals(numeric2) ? null : numeric1;
+    }
+
+    public static DecimalData nullif(DecimalData numeric1, DecimalData numeric2) {
+        if (numeric1 == null && numeric2 == null) {
+            return null;
+        }
+        if (numeric1 == null) {
+            return numeric2;
+        }
+        if (numeric2 == null) {
+            return numeric1;
+        }
+        return numeric1.equals(numeric2) ? null : numeric1;
+    }
+
+    public static Object coalesce(Object... objects) {
+        for (Object item : objects) {
+            if (item != null) {
+                return item;
+            }
+        }
+        return null;
     }
 }

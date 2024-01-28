@@ -23,6 +23,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.StringUtils;
+import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.parser.JaninoParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -71,6 +72,7 @@ public class ColumnTransform implements Serializable {
 
     public Object evaluate(BinaryRecordData after, TableInfo tableInfo) {
         List<Object> params = new ArrayList<>();
+        List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
@@ -78,6 +80,7 @@ public class ColumnTransform implements Serializable {
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
                 if (column.getName().equals(originalColumnName)) {
+                    argumentNames.add(originalColumnName);
                     paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     params.add(
                             DataTypeConverter.convertToOriginal(
@@ -86,6 +89,18 @@ public class ColumnTransform implements Serializable {
                 }
             }
         }
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
+            argumentNames.add(FlinkSqlParser.DEFAULT_DATABASE_NAME);
+            paramTypes.add(String.class);
+            params.add(tableInfo.getSchemaName());
+        }
+
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
+            argumentNames.add(FlinkSqlParser.DEFAULT_TABLE_NAME);
+            paramTypes.add(String.class);
+            params.add(tableInfo.getTableName());
+        }
+
         ExpressionEvaluator expressionEvaluator =
                 CompileUtils.compileExpression(
                         JaninoParser.loadSystemFunction(scriptExpression),

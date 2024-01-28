@@ -198,11 +198,18 @@ public class FlinkSqlParserTest {
         testFilterExpression("id <> '1'", "!String.valueOf('1').equals(id)");
         testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
         testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
+        testFilterExpression("d in (d1, d2)", "in(d, d1, d2)");
+        testFilterExpression("d not in (d1, d2)", "notIn(d, d1, d2)");
         testFilterExpression("id is false", "false == id");
         testFilterExpression("id is not false", "true == id");
         testFilterExpression("id is true", "true == id");
         testFilterExpression("id is not true", "false == id");
         testFilterExpression("a || b", "concat(a, b)");
+        testFilterExpression("CHAR_LENGTH(id)", "charLength(id)");
+        testFilterExpression("trim(id)", "trim('BOTH', String.valueOf(' '), id)");
+        testFilterExpression(
+                "REGEXP_REPLACE(id, '[a-zA-Z]', '')",
+                "regexpReplace(id, String.valueOf('[a-zA-Z]'), String.valueOf(''))");
         testFilterExpression("upper(id)", "upper(id)");
         testFilterExpression("lower(id)", "lower(id)");
         testFilterExpression("concat(a,b)", "concat(a, b)");
@@ -215,6 +222,26 @@ public class FlinkSqlParserTest {
         testFilterExpression("floor(2)", "floor(2)");
         testFilterExpression("round(2,2)", "round(2, 2)");
         testFilterExpression("uuid()", "uuid()");
+        testFilterExpression("id = LOCALTIME", "id == localtime()");
+        testFilterExpression("id = LOCALTIMESTAMP", "id == localtimestamp()");
+        testFilterExpression("id = CURRENT_TIME", "id == currentTime()");
+        testFilterExpression("id = CURRENT_DATE", "id == currentDate()");
+        testFilterExpression("id = CURRENT_TIMESTAMP", "id == currentTimestamp()");
+        testFilterExpression("NOW()", "now()");
+        testFilterExpression("YEAR(dt)", "year(dt)");
+        testFilterExpression("QUARTER(dt)", "quarter(dt)");
+        testFilterExpression("MONTH(dt)", "month(dt)");
+        testFilterExpression("WEEK(dt)", "week(dt)");
+        testFilterExpression(
+                "DATE_FORMAT(dt, 'yyyy-MM-dd')", "dateFormat(dt, String.valueOf('yyyy-MM-dd'))");
+        testFilterExpression(
+                "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, String.valueOf('yyyy-MM-dd'))");
+        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt)");
+        testFilterExpression(
+                "TIMESTAMP_DIFF('DAY', dt1, dt2)",
+                "timestampDiff(String.valueOf('DAY'), dt1, dt2)");
+        testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
+        testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
         testFilterExpression("id - 2", "id - 2");
         testFilterExpression("id * 2", "id * 2");
@@ -224,6 +251,10 @@ public class FlinkSqlParserTest {
         testFilterExpression("a <= b", "a <= b");
         testFilterExpression("a > b", "a > b");
         testFilterExpression("a >= b", "a >= b");
+        testFilterExpression(
+                "__table_name__ = 'tb'", "String.valueOf('tb').equals(__table_name__)");
+        testFilterExpression(
+                "__database_name__ = 'tb'", "String.valueOf('tb').equals(__database_name__)");
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null", "abs(uniq_id) > 10 && null != id");

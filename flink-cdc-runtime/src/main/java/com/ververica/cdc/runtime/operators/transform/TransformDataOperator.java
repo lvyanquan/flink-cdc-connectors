@@ -131,7 +131,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
         }
         transformSchema(tableId, newSchema);
-        tableInfoMap.put(tableId, TableInfo.of(tableId.identifier(), newSchema));
+        tableInfoMap.put(tableId, TableInfo.of(tableId, newSchema));
         return event;
     }
 

@@ -27,6 +27,7 @@ import org.apache.flink.table.planner.parse.CalciteParser;
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 
 import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
 import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
@@ -74,6 +75,8 @@ public class FlinkSqlParser {
     private static final CalciteParser calciteParser = getCalciteParser();
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
+    public static final String DEFAULT_DATABASE_NAME = "__database_name__";
+    public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
     private static CalciteParser getCalciteParser() {
         TableConfig tableConfig = TableConfig.getDefault();
@@ -98,10 +101,18 @@ public class FlinkSqlParser {
     }
 
     private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
+        List<Column> columnsWithMetadata = new ArrayList<>(columns);
+        if (sqlNode.toString().contains(DEFAULT_DATABASE_NAME)) {
+            columnsWithMetadata.add(
+                    Column.physicalColumn(DEFAULT_DATABASE_NAME, DataTypes.STRING()));
+        }
+        if (sqlNode.toString().contains(DEFAULT_TABLE_NAME)) {
+            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
+        }
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
         Map<String, Object> operand = new HashMap<>();
         operand.put("tableName", DEFAULT_TABLE);
-        operand.put("columns", columns);
+        operand.put("columns", columnsWithMetadata);
         rootSchema.add(
                 DEFAULT_SCHEMA,
                 FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
@@ -175,6 +186,10 @@ public class FlinkSqlParser {
                             SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
                             columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                         }
+                    }
+                    if (DEFAULT_TABLE_NAME.equals(columnName)
+                            || DEFAULT_DATABASE_NAME.equals(columnName)) {
+                        continue;
                     }
                     boolean hasReplacedDuplicateColumn = false;
                     for (int i = 0; i < columnTransformList.size(); i++) {
