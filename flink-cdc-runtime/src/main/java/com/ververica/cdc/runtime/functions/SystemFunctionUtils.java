@@ -145,23 +145,95 @@ public class SystemFunctionUtils {
         }
     }
 
-    // todo: Improve the comparison of various types.
-    public static boolean betweenAsymmetric(Object value, Object minValue, Object maxValue) {
-        if (value instanceof String) {
-            String valueStr = (String) value;
-            return valueStr.compareTo(String.valueOf(minValue)) >= 0
-                    && valueStr.compareTo(String.valueOf(maxValue)) <= 0;
-        } else if (value instanceof Integer) {
-            Integer valueInt = (Integer) value;
-            return valueInt >= Integer.parseInt(minValue.toString())
-                    && valueInt >= Integer.parseInt(maxValue.toString());
-        } else {
-            LOG.error("Unsupported type comparison: {}", value.getClass());
-            throw new RuntimeException("Unsupported type comparison: " + value.getClass());
+    public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
+        if (value == null) {
+            return false;
         }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
-    public static boolean notBetweenAsymmetric(Object value, Object minValue, Object maxValue) {
+    public static boolean betweenAsymmetric(Short value, short minValue, short maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
+    public static boolean betweenAsymmetric(Integer value, int minValue, int maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
+    public static boolean betweenAsymmetric(Long value, long minValue, long maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
+    public static boolean betweenAsymmetric(Float value, float minValue, float maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
+    public static boolean betweenAsymmetric(Double value, double minValue, double maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
+    public static boolean betweenAsymmetric(
+            BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
+    }
+
+    public static boolean betweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
+    }
+
+    public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(Short value, short minValue, short maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(Integer value, int minValue, int maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(Long value, long minValue, long maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(Float value, float minValue, float maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(Double value, double minValue, double maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(
+            BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -169,8 +241,64 @@ public class SystemFunctionUtils {
         return Arrays.stream(str).anyMatch(item -> value.equals(item));
     }
 
-    public static boolean notIn(String value, String... str) {
-        return !notIn(value, str);
+    public static boolean in(Short value, Short... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(Integer value, Integer... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(Long value, Long... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(Float value, Float... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(Double value, Double... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(BigDecimal value, BigDecimal... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean in(DecimalData value, DecimalData... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
+    public static boolean notIn(String value, String... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(Short value, Short... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(Integer value, Integer... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(Long value, Long... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(Float value, Float... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(Double value, Double... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(BigDecimal value, BigDecimal... values) {
+        return !notIn(value, values);
+    }
+
+    public static boolean notIn(DecimalData value, DecimalData... values) {
+        return !notIn(value, values);
     }
 
     public static int charLength(String str) {
