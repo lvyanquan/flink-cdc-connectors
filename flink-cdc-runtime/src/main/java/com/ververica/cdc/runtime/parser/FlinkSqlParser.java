@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -158,12 +159,12 @@ public class FlinkSqlParser {
             if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
-                    SqlBasicCall transform = null;
+                    Optional<SqlBasicCall> transformOptional = Optional.empty();
                     String columnName = null;
                     List<SqlNode> operandList = sqlBasicCall.getOperandList();
                     for (SqlNode operand : operandList) {
                         if (operand instanceof SqlBasicCall) {
-                            transform = (SqlBasicCall) operand;
+                            transformOptional = Optional.of((SqlBasicCall) operand);
                         } else if (operand instanceof SqlIdentifier) {
                             SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
                             columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
@@ -173,33 +174,31 @@ public class FlinkSqlParser {
                             || DEFAULT_DATABASE_NAME.equals(columnName)) {
                         continue;
                     }
+                    ColumnTransform columnTransform =
+                            transformOptional.isPresent()
+                                    ? ColumnTransform.of(
+                                            columnName,
+                                            DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                                    relDataTypeMap.get(columnName)),
+                                            transformOptional.get().toString(),
+                                            JaninoParser.translateSqlNodeToJaninoExpression(
+                                                    transformOptional.get()),
+                                            parseColumnNameList(transformOptional.get()))
+                                    : ColumnTransform.of(
+                                            columnName,
+                                            DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                                    relDataTypeMap.get(columnName)));
                     boolean hasReplacedDuplicateColumn = false;
                     for (int i = 0; i < columnTransformList.size(); i++) {
                         if (columnTransformList.get(i).getColumnName().equals(columnName)
                                 && !columnTransformList.get(i).isValidProjection()) {
                             hasReplacedDuplicateColumn = true;
-                            columnTransformList.set(
-                                    i,
-                                    ColumnTransform.of(
-                                            columnName,
-                                            DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                                    relDataTypeMap.get(columnName)),
-                                            transform.toString(),
-                                            JaninoParser.translateSqlNodeToJaninoExpression(
-                                                    transform),
-                                            parseColumnNameList(transform)));
+                            columnTransformList.set(i, columnTransform);
                             break;
                         }
                     }
                     if (!hasReplacedDuplicateColumn) {
-                        columnTransformList.add(
-                                ColumnTransform.of(
-                                        columnName,
-                                        DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                                relDataTypeMap.get(columnName)),
-                                        transform.toString(),
-                                        JaninoParser.translateSqlNodeToJaninoExpression(transform),
-                                        parseColumnNameList(transform)));
+                        columnTransformList.add(columnTransform);
                     }
                 } else {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());

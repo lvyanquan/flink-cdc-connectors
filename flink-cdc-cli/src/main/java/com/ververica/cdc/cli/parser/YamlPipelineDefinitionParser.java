@@ -22,6 +22,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
@@ -174,6 +175,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_PROJECTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        if (!StringUtils.isNullOrWhitespaceOnly(projection) && projection.contains("\\*")) {
+            projection = projection.replace("\\*", "*");
+        }
         String filter =
                 Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
                         .map(JsonNode::asText)
