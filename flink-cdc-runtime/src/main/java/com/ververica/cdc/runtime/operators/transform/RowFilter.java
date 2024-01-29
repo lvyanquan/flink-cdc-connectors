@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** The RowFilter applies to describe the row filter of filtering tables. */
 public class RowFilter {
@@ -52,26 +53,47 @@ public class RowFilter {
         return new RowFilter(expression, scriptExpression, columnNames);
     }
 
-    public static RowFilter generateRowFilter(String filterExpression) {
+    public static Optional<RowFilter> generateRowFilter(String filterExpression) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
-            return null;
+            return Optional.empty();
         }
         List<String> columnNames = FlinkSqlParser.parseFilterColumnNameList(filterExpression);
         String scriptExpression =
                 FlinkSqlParser.translateFilterExpressionToJaninoExpression(filterExpression);
-        return of(filterExpression, scriptExpression, columnNames);
+        return Optional.of(of(filterExpression, scriptExpression, columnNames));
     }
 
     public boolean run(BinaryRecordData after, TableInfo tableInfo) {
+        if (expressionEvaluator == null) {
+            cacheExpressionEvaluator(tableInfo);
+        }
+        try {
+            return (Boolean) expressionEvaluator.evaluate(generateParams(after, tableInfo));
+        } catch (InvocationTargetException e) {
+            LOG.error("Table:{} filter:{} execute failed. {}", tableInfo.getName(), expression, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Object[] generateParams(BinaryRecordData after, TableInfo tableInfo) {
         List<Column> columns = tableInfo.getSchema().getColumns();
         List<Object> params = new ArrayList<>();
-        List<Class<?>> paramTypes = new ArrayList<>();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
         for (int i = 0; i < columns.size(); i++) {
             if (columnNames.contains(columns.get(i).getName())) {
                 params.add(
                         DataTypeConverter.convertToOriginal(
                                 fieldGetters[i].getFieldOrNull(after), columns.get(i).getType()));
+            }
+        }
+        return params.toArray();
+    }
+
+    private void cacheExpressionEvaluator(TableInfo tableInfo) {
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        List<Class<?>> paramTypes = new ArrayList<>();
+        for (int i = 0; i < columns.size(); i++) {
+            if (columnNames.contains(columns.get(i).getName())) {
                 paramTypes.add(DataTypeConverter.convertOriginalClass(columns.get(i).getType()));
             }
         }
@@ -82,12 +104,6 @@ public class RowFilter {
                             columnNames,
                             paramTypes,
                             Boolean.class);
-        }
-        try {
-            return (Boolean) expressionEvaluator.evaluate(params.toArray());
-        } catch (InvocationTargetException e) {
-            LOG.error("Table:{} filter:{} execute failed. {}", tableInfo.getName(), expression, e);
-            throw new RuntimeException(e);
         }
     }
 

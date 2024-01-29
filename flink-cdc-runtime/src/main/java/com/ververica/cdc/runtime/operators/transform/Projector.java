@@ -27,6 +27,7 @@ import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** The Projector applies to describe the projection of filtering tables. */
@@ -47,11 +48,11 @@ public class Projector {
         return new Projector(projection, columnTransformList);
     }
 
-    public static Projector generateProjector(String projection) {
+    public static Optional<Projector> generateProjector(String projection) {
         if (StringUtils.isNullOrWhitespaceOnly(projection)) {
-            return null;
+            return Optional.empty();
         }
-        return of(projection, new ArrayList<>());
+        return Optional.of(of(projection, new ArrayList<>()));
     }
 
     private List<Column> getAllColumnList() {

@@ -42,6 +42,7 @@ public class ColumnTransform implements Serializable {
     private final String expression;
     private final String scriptExpression;
     private final List<String> originalColumnNames;
+    private ExpressionEvaluator expressionEvaluator;
 
     public ColumnTransform(
             Column column,
@@ -71,44 +72,11 @@ public class ColumnTransform implements Serializable {
     }
 
     public Object evaluate(BinaryRecordData after, TableInfo tableInfo) {
-        List<Object> params = new ArrayList<>();
-        List<String> argumentNames = new ArrayList<>();
-        List<Class<?>> paramTypes = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
-        for (String originalColumnName : originalColumnNames) {
-            for (int i = 0; i < columns.size(); i++) {
-                Column column = columns.get(i);
-                if (column.getName().equals(originalColumnName)) {
-                    argumentNames.add(originalColumnName);
-                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    params.add(
-                            DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
-                    break;
-                }
-            }
+        if (expressionEvaluator == null) {
+            cacheExpressionEvaluator(tableInfo);
         }
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
-            argumentNames.add(FlinkSqlParser.DEFAULT_DATABASE_NAME);
-            paramTypes.add(String.class);
-            params.add(tableInfo.getSchemaName());
-        }
-
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
-            argumentNames.add(FlinkSqlParser.DEFAULT_TABLE_NAME);
-            paramTypes.add(String.class);
-            params.add(tableInfo.getTableName());
-        }
-
-        ExpressionEvaluator expressionEvaluator =
-                CompileUtils.compileExpression(
-                        JaninoParser.loadSystemFunction(scriptExpression),
-                        originalColumnNames,
-                        paramTypes,
-                        DataTypeConverter.convertOriginalClass(column.getType()));
         try {
-            return expressionEvaluator.evaluate(params.toArray());
+            return expressionEvaluator.evaluate(generateParams(after, tableInfo));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} column:{} projection:{} execute failed. {}",
@@ -118,6 +86,62 @@ public class ColumnTransform implements Serializable {
                     e);
             throw new RuntimeException(e);
         }
+    }
+
+    private Object[] generateParams(BinaryRecordData after, TableInfo tableInfo) {
+        List<Object> params = new ArrayList<>();
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
+        for (String originalColumnName : originalColumnNames) {
+            for (int i = 0; i < columns.size(); i++) {
+                Column column = columns.get(i);
+                if (column.getName().equals(originalColumnName)) {
+                    params.add(
+                            DataTypeConverter.convertToOriginal(
+                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                    break;
+                }
+            }
+        }
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
+            params.add(tableInfo.getSchemaName());
+        }
+
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
+            params.add(tableInfo.getTableName());
+        }
+        return params.toArray();
+    }
+
+    private void cacheExpressionEvaluator(TableInfo tableInfo) {
+        List<String> argumentNames = new ArrayList<>();
+        List<Class<?>> paramTypes = new ArrayList<>();
+        List<Column> columns = tableInfo.getSchema().getColumns();
+        for (String originalColumnName : originalColumnNames) {
+            for (int i = 0; i < columns.size(); i++) {
+                Column column = columns.get(i);
+                if (column.getName().equals(originalColumnName)) {
+                    argumentNames.add(originalColumnName);
+                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    break;
+                }
+            }
+        }
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
+            argumentNames.add(FlinkSqlParser.DEFAULT_DATABASE_NAME);
+            paramTypes.add(String.class);
+        }
+
+        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
+            argumentNames.add(FlinkSqlParser.DEFAULT_TABLE_NAME);
+            paramTypes.add(String.class);
+        }
+        expressionEvaluator =
+                CompileUtils.compileExpression(
+                        JaninoParser.loadSystemFunction(scriptExpression),
+                        originalColumnNames,
+                        paramTypes,
+                        DataTypeConverter.convertOriginalClass(column.getType()));
     }
 
     public static ColumnTransform of(String columnName, DataType dataType) {

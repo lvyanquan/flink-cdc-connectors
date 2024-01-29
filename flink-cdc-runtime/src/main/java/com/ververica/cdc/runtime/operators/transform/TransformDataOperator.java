@@ -35,6 +35,8 @@ import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +49,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
     private final List<Tuple3<String, String, String>> transformRules;
-    private transient List<Tuple4<Selectors, Projector, RowFilter, Boolean>> transforms;
+    private transient List<Tuple4<Selectors, Optional<Projector>, Optional<RowFilter>, Boolean>>
+            transforms;
 
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
@@ -61,7 +64,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         private final List<Tuple3<String, String, String>> transformRules = new ArrayList<>();
 
         public TransformDataOperator.Builder addTransform(
-                String tableInclusions, String projection, String filter) {
+                String tableInclusions, @Nullable String projection, @Nullable String filter) {
             transformRules.add(Tuple3.of(tableInclusions, projection, filter));
             return this;
         }
@@ -136,10 +139,11 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     private void transformSchema(TableId tableId, Schema schema) {
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> transform : transforms) {
+        for (Tuple4<Selectors, Optional<Projector>, Optional<RowFilter>, Boolean> transform :
+                transforms) {
             Selectors selectors = transform.f0;
-            if (selectors.isMatch(tableId)) {
-                Projector projector = transform.f1;
+            if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
+                Projector projector = transform.f1.get();
                 // update the columns of projection and add the column of projection into Schema
                 projector.applySchemaChangeEvent(schema);
             }
@@ -150,32 +154,37 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
         TableId tableId = dataChangeEvent.tableId();
 
-        for (Tuple4<Selectors, Projector, RowFilter, Boolean> transform : transforms) {
+        for (Tuple4<Selectors, Optional<Projector>, Optional<RowFilter>, Boolean> transform :
+                transforms) {
             Selectors selectors = transform.f0;
             Boolean isPreProjection = transform.f3;
             if (selectors.isMatch(tableId)) {
-                Projector projector = transform.f1;
-                if (isPreProjection && projector != null && projector.isValid()) {
+                Optional<Projector> projectorOptional = transform.f1;
+                if (isPreProjection
+                        && projectorOptional.isPresent()
+                        && projectorOptional.get().isValid()) {
                     dataChangeEventOptional =
-                            applyProjection(projector, dataChangeEventOptional.get());
+                            applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
                 }
-                RowFilter rowFilter = transform.f2;
-                if (rowFilter != null && rowFilter.isVaild()) {
-                    dataChangeEventOptional = applyFilter(rowFilter, dataChangeEventOptional.get());
+                Optional<RowFilter> rowFilterOptional = transform.f2;
+                if (rowFilterOptional.isPresent() && rowFilterOptional.get().isVaild()) {
+                    dataChangeEventOptional =
+                            applyFilter(rowFilterOptional.get(), dataChangeEventOptional.get());
                 }
                 if (!isPreProjection
                         && dataChangeEventOptional.isPresent()
-                        && projector != null
-                        && projector.isValid()) {
+                        && projectorOptional.isPresent()
+                        && projectorOptional.get().isValid()) {
                     dataChangeEventOptional =
-                            applyProjection(projector, dataChangeEventOptional.get());
+                            applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
                 }
             }
         }
         return dataChangeEventOptional;
     }
 
-    private Optional applyFilter(RowFilter rowFilter, DataChangeEvent dataChangeEvent) {
+    private Optional<DataChangeEvent> applyFilter(
+            RowFilter rowFilter, DataChangeEvent dataChangeEvent) {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         // insert and update event only apply afterData, delete only apply beforeData
@@ -195,7 +204,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         return Optional.empty();
     }
 
-    private Optional applyProjection(Projector projector, DataChangeEvent dataChangeEvent) {
+    private Optional<DataChangeEvent> applyProjection(
+            Projector projector, DataChangeEvent dataChangeEvent) {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {

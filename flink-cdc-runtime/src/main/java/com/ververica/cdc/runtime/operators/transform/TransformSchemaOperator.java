@@ -32,9 +32,12 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.schema.Selectors;
 import com.ververica.cdc.common.utils.SchemaUtils;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -43,7 +46,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
     private final List<Tuple2<String, String>> transformRules;
-    private transient List<Tuple2<Selectors, Projector>> transforms;
+    private transient List<Tuple2<Selectors, Optional<Projector>>> transforms;
 
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
@@ -59,7 +62,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         private final List<Tuple2<String, String>> transformRules = new ArrayList<>();
 
         public TransformSchemaOperator.Builder addTransform(
-                String tableInclusions, String projection) {
+                String tableInclusions, @Nullable String projection) {
             transformRules.add(Tuple2.of(tableInclusions, projection));
             return this;
         }
@@ -136,10 +139,10 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        for (Tuple2<Selectors, Projector> transform : transforms) {
+        for (Tuple2<Selectors, Optional<Projector>> transform : transforms) {
             Selectors selectors = transform.f0;
-            if (selectors.isMatch(tableId)) {
-                Projector projector = transform.f1;
+            if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
+                Projector projector = transform.f1.get();
                 // update the columns of projection and add the column of projection into Schema
                 return projector.applyCreateTableEvent(createTableEvent);
             }
@@ -149,10 +152,10 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
 
     private DataChangeEvent applyDataChangeEvent(DataChangeEvent dataChangeEvent) {
         TableId tableId = dataChangeEvent.tableId();
-        for (Tuple2<Selectors, Projector> transform : transforms) {
+        for (Tuple2<Selectors, Optional<Projector>> transform : transforms) {
             Selectors selectors = transform.f0;
-            if (selectors.isMatch(tableId)) {
-                Projector projector = transform.f1;
+            if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
+                Projector projector = transform.f1.get();
                 if (projector != null && projector.isValid()) {
                     return applyProjection(projector, dataChangeEvent);
                 }

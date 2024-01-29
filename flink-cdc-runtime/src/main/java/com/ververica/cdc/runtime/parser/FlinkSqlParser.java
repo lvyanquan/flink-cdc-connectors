@@ -18,13 +18,9 @@ package com.ververica.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.sql.parser.validate.FlinkSqlConformance;
-import org.apache.flink.table.api.SqlDialect;
-import org.apache.flink.table.api.TableConfig;
-import org.apache.flink.table.planner.calcite.CalciteConfig;
 import org.apache.flink.table.planner.delegation.FlinkSqlParserFactories;
 import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
 import org.apache.flink.table.planner.parse.CalciteParser;
-import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataTypes;
@@ -54,7 +50,6 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.util.SqlOperatorTables;
-import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -67,8 +62,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.table.planner.utils.TableConfigUtils.getCalciteConfig;
-
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class FlinkSqlParser {
 
@@ -79,24 +72,13 @@ public class FlinkSqlParser {
     public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
     private static CalciteParser getCalciteParser() {
-        TableConfig tableConfig = TableConfig.getDefault();
-        tableConfig.setSqlDialect(SqlDialect.DEFAULT);
-        CalciteConfig calciteConfig = getCalciteConfig(tableConfig);
         SqlParser.Config sqlParserConfig =
-                JavaScalaConversionUtil.<SqlParser.Config>toJava(calciteConfig.getSqlParserConfig())
-                        .orElseGet(
-                                // we use Java lex because back ticks are easier than double quotes
-                                // in
-                                // programming and cases are preserved
-                                () -> {
-                                    SqlConformance conformance = FlinkSqlConformance.DEFAULT;
-                                    return SqlParser.config()
-                                            .withParserFactory(
-                                                    FlinkSqlParserFactories.create(conformance))
-                                            .withConformance(conformance)
-                                            .withLex(Lex.JAVA)
-                                            .withIdentifierMaxLength(256);
-                                });
+                SqlParser.config()
+                        .withParserFactory(
+                                FlinkSqlParserFactories.create(FlinkSqlConformance.DEFAULT))
+                        .withConformance(FlinkSqlConformance.DEFAULT)
+                        .withLex(Lex.JAVA)
+                        .withIdentifierMaxLength(256);
         return new CalciteParser(sqlParserConfig);
     }
 

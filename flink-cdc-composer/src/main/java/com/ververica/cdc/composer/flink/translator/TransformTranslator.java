@@ -38,7 +38,7 @@ public class TransformTranslator {
         TransformSchemaOperator.Builder transformSchemaFunctionBuilder =
                 TransformSchemaOperator.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection() || transform.isValidFilter()) {
+            if (transform.isValidProjection()) {
                 transformSchemaFunctionBuilder.addTransform(
                         transform.getSourceTable(), transform.getProjection().get());
             }
@@ -58,8 +58,8 @@ public class TransformTranslator {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 transformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
-                        transform.getProjection().get(),
-                        transform.getFilter().get());
+                        transform.isValidProjection() ? transform.getProjection().get() : null,
+                        transform.isValidFilter() ? transform.getFilter().get() : null);
             }
         }
         return input.transform(
