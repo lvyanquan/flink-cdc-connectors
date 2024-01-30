@@ -16,16 +16,11 @@
 
 package com.ververica.cdc.runtime.parser.validate;
 
-import org.apache.flink.calcite.shaded.com.google.common.collect.ImmutableMultimap;
-
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.functions.SystemFunctionUtils;
-import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,9 +40,6 @@ public class FlinkCDCSchemaFactory implements SchemaFactory {
         }
         String tableName = String.valueOf(operand.get("tableName"));
         List<Column> columns = (List<Column>) operand.get("columns");
-        ImmutableMultimap<String, Function> functions =
-                ScalarFunctionImpl.functions(SystemFunctionUtils.class);
-        return new FlinkCDCSchema(
-                schemaName, Arrays.asList(new FlinkCDCTable(tableName, columns)), functions);
+        return new FlinkCDCSchema(schemaName, Arrays.asList(new FlinkCDCTable(tableName, columns)));
     }
 }

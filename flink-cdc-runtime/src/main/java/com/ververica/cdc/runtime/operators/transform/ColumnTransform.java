@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.runtime.operators.transform;
 
-import org.apache.flink.table.runtime.generated.CompileUtils;
-
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
@@ -137,7 +135,7 @@ public class ColumnTransform implements Serializable {
             paramTypes.add(String.class);
         }
         expressionEvaluator =
-                CompileUtils.compileExpression(
+                JaninoParser.compileExpression(
                         JaninoParser.loadSystemFunction(scriptExpression),
                         originalColumnNames,
                         paramTypes,

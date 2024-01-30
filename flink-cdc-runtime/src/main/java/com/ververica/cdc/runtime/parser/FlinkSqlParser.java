@@ -17,10 +17,6 @@
 package com.ververica.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
-import org.apache.flink.sql.parser.validate.FlinkSqlConformance;
-import org.apache.flink.table.planner.delegation.FlinkSqlParserFactories;
-import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
-import org.apache.flink.table.planner.parse.CalciteParser;
 
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataTypes;
@@ -47,13 +43,18 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.util.SqlOperatorTables;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -65,22 +66,19 @@ import java.util.stream.Collectors;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class FlinkSqlParser {
-
-    private static final CalciteParser calciteParser = getCalciteParser();
+    private static final Logger LOG = LoggerFactory.getLogger(FlinkSqlParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
     public static final String DEFAULT_DATABASE_NAME = "__database_name__";
     public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
-    private static CalciteParser getCalciteParser() {
-        SqlParser.Config sqlParserConfig =
-                SqlParser.config()
-                        .withParserFactory(
-                                FlinkSqlParserFactories.create(FlinkSqlConformance.DEFAULT))
-                        .withConformance(FlinkSqlConformance.DEFAULT)
-                        .withLex(Lex.JAVA)
-                        .withIdentifierMaxLength(256);
-        return new CalciteParser(sqlParserConfig);
+    private static SqlParser getCalciteParser(String sql) {
+        return SqlParser.create(
+                sql,
+                SqlParser.Config.DEFAULT
+                        .withConformance(SqlConformanceEnum.MYSQL_5)
+                        .withCaseSensitive(true)
+                        .withLex(Lex.JAVA));
     }
 
     private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
@@ -107,10 +105,10 @@ public class FlinkSqlParser {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
-        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -130,7 +128,13 @@ public class FlinkSqlParser {
     }
 
     public static SqlSelect parseSelect(String statement) {
-        SqlNode sqlNode = calciteParser.parse(statement);
+        SqlNode sqlNode = null;
+        try {
+            sqlNode = getCalciteParser(statement).parseQuery();
+        } catch (SqlParseException e) {
+            LOG.error("Statements can not be parsed. {} \n {}", statement, e);
+            e.printStackTrace();
+        }
         if (sqlNode instanceof SqlSelect) {
             return (SqlSelect) sqlNode;
         } else {

@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.runtime.parser;
 
-import org.apache.flink.table.runtime.generated.CompileUtils;
-
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -74,7 +72,7 @@ public class JaninoParserTest {
         List<Class<?>> paramTypes = Arrays.asList(Double.class);
         List<Object> params = Arrays.asList(3.14);
         ExpressionEvaluator expressionEvaluator =
-                CompileUtils.compileExpression(expression, columnNames, paramTypes, Boolean.class);
+                JaninoParser.compileExpression(expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assert.assertEquals(evaluate, true);
     }
@@ -86,7 +84,7 @@ public class JaninoParserTest {
         List<Class<?>> paramTypes = Arrays.asList(String.class);
         List<Object> params = Arrays.asList("2");
         ExpressionEvaluator expressionEvaluator =
-                CompileUtils.compileExpression(expression, columnNames, paramTypes, Boolean.class);
+                JaninoParser.compileExpression(expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assert.assertEquals(evaluate, true);
     }

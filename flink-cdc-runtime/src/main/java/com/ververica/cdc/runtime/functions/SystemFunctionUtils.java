@@ -16,9 +16,6 @@
 
 package com.ververica.cdc.runtime.functions;
 
-import org.apache.flink.table.data.DecimalData;
-import org.apache.flink.table.data.DecimalDataUtils;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +33,6 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.apache.flink.table.data.DecimalDataUtils.doubleValue;
 
 /** System function utils to support the call of flink cdc pipeline transform. */
 public class SystemFunctionUtils {
@@ -195,14 +190,6 @@ public class SystemFunctionUtils {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
-    public static boolean betweenAsymmetric(
-            DecimalData value, DecimalData minValue, DecimalData maxValue) {
-        if (value == null) {
-            return false;
-        }
-        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
-    }
-
     public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -229,11 +216,6 @@ public class SystemFunctionUtils {
 
     public static boolean notBetweenAsymmetric(
             BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
-        return !betweenAsymmetric(value, minValue, maxValue);
-    }
-
-    public static boolean notBetweenAsymmetric(
-            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -265,10 +247,6 @@ public class SystemFunctionUtils {
         return Arrays.stream(values).anyMatch(item -> value.equals(item));
     }
 
-    public static boolean in(DecimalData value, DecimalData... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
-    }
-
     public static boolean notIn(String value, String... values) {
         return !notIn(value, values);
     }
@@ -294,10 +272,6 @@ public class SystemFunctionUtils {
     }
 
     public static boolean notIn(BigDecimal value, BigDecimal... values) {
-        return !notIn(value, values);
-    }
-
-    public static boolean notIn(DecimalData value, DecimalData... values) {
         return !notIn(value, values);
     }
 
@@ -358,18 +332,6 @@ public class SystemFunctionUtils {
         return str.toLowerCase();
     }
 
-    public static double power(double base, DecimalData exponent) {
-        return Math.pow(base, doubleValue(exponent));
-    }
-
-    public static double power(DecimalData base, DecimalData exponent) {
-        return Math.pow(doubleValue(base), doubleValue(exponent));
-    }
-
-    public static double power(DecimalData base, double exponent) {
-        return Math.pow(doubleValue(base), exponent);
-    }
-
     /** SQL <code>ABS</code> operator applied to byte values. */
     public static byte abs(byte b0) {
         return (byte) Math.abs(b0);
@@ -400,10 +362,6 @@ public class SystemFunctionUtils {
         return Math.abs(b0);
     }
 
-    public static DecimalData abs(DecimalData a) {
-        return DecimalDataUtils.abs(a);
-    }
-
     public static double floor(double b0) {
         return Math.floor(b0);
     }
@@ -430,10 +388,6 @@ public class SystemFunctionUtils {
         return b0 - r;
     }
 
-    public static DecimalData floor(DecimalData a) {
-        return DecimalDataUtils.floor(a);
-    }
-
     public static double ceil(double b0) {
         return Math.ceil(b0);
     }
@@ -454,10 +408,6 @@ public class SystemFunctionUtils {
     /** SQL <code>CEIL</code> operator applied to long values. */
     public static long ceil(long b0, long b1) {
         return floor(b0 + b1 - 1, b1);
-    }
-
-    public static DecimalData ceil(DecimalData a) {
-        return DecimalDataUtils.ceil(a);
     }
 
     // SQL ROUND
@@ -531,16 +481,6 @@ public class SystemFunctionUtils {
         return round(BigDecimal.valueOf(b0), b1).doubleValue();
     }
 
-    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
-    public static DecimalData round(DecimalData b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
-    public static DecimalData round(DecimalData b0, int b1) {
-        return DecimalDataUtils.sround(b0, b1);
-    }
-
     public static String uuid() {
         return UUID.randomUUID().toString();
     }
@@ -587,19 +527,6 @@ public class SystemFunctionUtils {
     }
 
     public static BigDecimal nullif(BigDecimal numeric1, BigDecimal numeric2) {
-        if (numeric1 == null && numeric2 == null) {
-            return null;
-        }
-        if (numeric1 == null) {
-            return numeric2;
-        }
-        if (numeric2 == null) {
-            return numeric1;
-        }
-        return numeric1.equals(numeric2) ? null : numeric1;
-    }
-
-    public static DecimalData nullif(DecimalData numeric1, DecimalData numeric2) {
         if (numeric1 == null && numeric2 == null) {
             return null;
         }

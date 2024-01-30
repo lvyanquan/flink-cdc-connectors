@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.runtime.parser;
 
+import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
 
 import com.ververica.cdc.common.utils.StringUtils;
@@ -26,7 +27,9 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
+import org.codehaus.janino.ExpressionEvaluator;
 import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
@@ -48,6 +51,26 @@ public class JaninoParser {
     public static String loadSystemFunction(String expression) {
         return "import static com.ververica.cdc.runtime.functions.SystemFunctionUtils.*;"
                 + expression;
+    }
+
+    public static ExpressionEvaluator compileExpression(
+            String code,
+            List<String> argumentNames,
+            List<Class<?>> argumentClasses,
+            Class<?> returnClass) {
+        ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
+        expressionEvaluator.setParameters(
+                argumentNames.toArray(new String[0]), argumentClasses.toArray(new Class[0]));
+        expressionEvaluator.setExpressionType(returnClass);
+        try {
+            expressionEvaluator.cook(code);
+            return expressionEvaluator;
+        } catch (CompileException e) {
+            throw new InvalidProgramException(
+                    "Expression cannot be compiled. This is a bug. Please file an issue.\nExpression: "
+                            + code,
+                    e);
+        }
     }
 
     public static String translateSqlNodeToJaninoExpression(SqlBasicCall transform) {

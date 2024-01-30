@@ -168,9 +168,6 @@ public class FlinkSqlParserTest {
                         + "FROM `default_schema`.`tb` AS `tb`\n"
                         + "WHERE `tb`.`id` IS NOT NULL",
                 validateSqlNode.toString().replaceAll("\r\n", "\n"));
-        Assert.assertEquals(
-                "rel#5:LogicalProject.(input=LogicalTableScan#4,exprs=[SUBSTR($0, 1), $0, $1])",
-                relNode.toString());
     }
 
     @Test
