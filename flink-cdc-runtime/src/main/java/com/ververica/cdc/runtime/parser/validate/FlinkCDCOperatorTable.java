@@ -189,7 +189,7 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
                     .notDeterministic()
                     .build();
     public static final SqlFunction MOD = SqlStdOperatorTable.MOD;
-    public static final SqlFunction LOCALTIME = SqlStdOperatorTable.LOCALTIME;
+
     public static final SqlFunction YEAR = SqlStdOperatorTable.YEAR;
     public static final SqlFunction QUARTER = SqlStdOperatorTable.QUARTER;
     public static final SqlFunction MONTH = SqlStdOperatorTable.MONTH;

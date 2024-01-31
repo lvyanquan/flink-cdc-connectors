@@ -219,7 +219,6 @@ public class FlinkSqlParserTest {
         testFilterExpression("floor(2)", "floor(2)");
         testFilterExpression("round(2,2)", "round(2, 2)");
         testFilterExpression("uuid()", "uuid()");
-        testFilterExpression("id = LOCALTIME", "id == localtime()");
         testFilterExpression("id = LOCALTIMESTAMP", "id == localtimestamp()");
         testFilterExpression("id = CURRENT_TIME", "id == currentTime()");
         testFilterExpression("id = CURRENT_DATE", "id == currentDate()");

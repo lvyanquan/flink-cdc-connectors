@@ -41,12 +41,7 @@ public class JaninoParser {
 
     private static final List<SqlTypeName> SQL_TYPE_NAME_IGNORE = Arrays.asList(SqlTypeName.SYMBOL);
     private static final List<String> SQL_NAME_CALL_FUNCTION =
-            Arrays.asList(
-                    "LOCALTIME",
-                    "LOCALTIMESTAMP",
-                    "CURRENT_TIME",
-                    "CURRENT_DATE",
-                    "CURRENT_TIMESTAMP");
+            Arrays.asList("LOCALTIMESTAMP", "CURRENT_TIME", "CURRENT_DATE", "CURRENT_TIMESTAMP");
 
     public static String loadSystemFunction(String expression) {
         return "import static com.ververica.cdc.runtime.functions.SystemFunctionUtils.*;"
