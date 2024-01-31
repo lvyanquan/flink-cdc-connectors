@@ -18,7 +18,6 @@ package com.ververica.cdc.runtime.parser;
 
 import org.apache.flink.table.api.ApiExpression;
 import org.apache.flink.table.api.Expressions;
-import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
 
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
@@ -36,6 +35,7 @@ import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -93,10 +93,10 @@ public class FlinkSqlParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
-        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -133,10 +133,10 @@ public class FlinkSqlParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
-        FlinkSqlOperatorTable flinkSqlOperatorTable = FlinkSqlOperatorTable.instance(false);
+        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(flinkSqlOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));

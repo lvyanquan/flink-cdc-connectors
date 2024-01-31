@@ -73,9 +73,15 @@ public class JaninoParser {
         }
     }
 
-    public static String translateSqlNodeToJaninoExpression(SqlBasicCall transform) {
-        Java.Rvalue rvalue = translateJaninoAST(transform);
-        return rvalue.toString();
+    public static String translateSqlNodeToJaninoExpression(SqlNode transform) {
+        if (transform instanceof SqlIdentifier) {
+            SqlIdentifier sqlIdentifier = (SqlIdentifier) transform;
+            return sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+        } else if (transform instanceof SqlBasicCall) {
+            Java.Rvalue rvalue = translateJaninoAST((SqlBasicCall) transform);
+            return rvalue.toString();
+        }
+        return "";
     }
 
     private static Java.Rvalue translateJaninoAST(SqlBasicCall sqlBasicCall) {

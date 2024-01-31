@@ -18,9 +18,14 @@ package com.ververica.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -33,6 +38,7 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.schema.Selectors;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.common.utils.StringUtils;
+import com.ververica.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 
 import javax.annotation.Nullable;
@@ -48,6 +54,8 @@ import java.util.stream.Collectors;
 public class TransformDataOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
+    private SchemaEvolutionClient schemaEvolutionClient;
+    private final OperatorID schemaOperatorID;
     private final List<Tuple3<String, String, String>> transformRules;
     private transient List<Tuple4<Selectors, Optional<Projector>, Optional<RowFilter>, Boolean>>
             transforms;
@@ -62,6 +70,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     /** Builder of {@link TransformDataOperator}. */
     public static class Builder {
         private final List<Tuple3<String, String, String>> transformRules = new ArrayList<>();
+        private OperatorID schemaOperatorID;
 
         public TransformDataOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
@@ -69,14 +78,33 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public TransformDataOperator.Builder addSchemaOperatorID(OperatorID schemaOperatorID) {
+            this.schemaOperatorID = schemaOperatorID;
+            return this;
+        }
+
         public TransformDataOperator build() {
-            return new TransformDataOperator(transformRules);
+            return new TransformDataOperator(transformRules, schemaOperatorID);
         }
     }
 
-    private TransformDataOperator(List<Tuple3<String, String, String>> transformRules) {
+    private TransformDataOperator(
+            List<Tuple3<String, String, String>> transformRules, OperatorID schemaOperatorID) {
         this.transformRules = transformRules;
+        this.schemaOperatorID = schemaOperatorID;
         this.tableInfoMap = new ConcurrentHashMap<>();
+    }
+
+    @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Event>> output) {
+        super.setup(containingTask, config, output);
+        schemaEvolutionClient =
+                new SchemaEvolutionClient(
+                        containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
+                        schemaOperatorID);
     }
 
     @Override
@@ -105,6 +133,11 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     @Override
+    public void initializeState(StateInitializationContext context) throws Exception {
+        schemaEvolutionClient.registerSubtask(getRuntimeContext().getIndexOfThisSubtask());
+    }
+
+    @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
         if (event instanceof FlushEvent) {
@@ -121,21 +154,33 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private SchemaChangeEvent cacheSchema(SchemaChangeEvent event) {
+    private SchemaChangeEvent cacheSchema(SchemaChangeEvent event) throws Exception {
         TableId tableId = event.tableId();
         Schema newSchema;
         if (event instanceof CreateTableEvent) {
             newSchema = ((CreateTableEvent) event).getSchema();
         } else {
-            TableInfo tableInfo = tableInfoMap.get(tableId);
-            if (tableInfo == null) {
-                throw new RuntimeException("Schema of " + tableId + " is not existed.");
-            }
-            newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.getSchema(), event);
+            newSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            getTableInfoFromSchemaEvolutionClient(tableId).getSchema(), event);
         }
         transformSchema(tableId, newSchema);
         tableInfoMap.put(tableId, TableInfo.of(tableId, newSchema));
         return event;
+    }
+
+    private TableInfo getTableInfoFromSchemaEvolutionClient(TableId tableId) throws Exception {
+        TableInfo tableInfo = tableInfoMap.get(tableId);
+        if (tableInfo == null) {
+            Optional<Schema> schemaOptional = schemaEvolutionClient.getLatestSchema(tableId);
+            if (schemaOptional.isPresent()) {
+                tableInfo = TableInfo.of(tableId, schemaOptional.get());
+            } else {
+                throw new RuntimeException(
+                        "Could not find schema message from SchemaRegistry for " + tableId);
+            }
+        }
+        return tableInfo;
     }
 
     private void transformSchema(TableId tableId, Schema schema) {

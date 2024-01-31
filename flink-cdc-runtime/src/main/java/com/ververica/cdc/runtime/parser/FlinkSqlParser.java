@@ -163,14 +163,14 @@ public class FlinkSqlParser {
             if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
-                    Optional<SqlBasicCall> transformOptional = Optional.empty();
+                    Optional<SqlNode> transformOptional = Optional.empty();
                     String columnName = null;
                     List<SqlNode> operandList = sqlBasicCall.getOperandList();
-                    for (SqlNode operand : operandList) {
-                        if (operand instanceof SqlBasicCall) {
-                            transformOptional = Optional.of((SqlBasicCall) operand);
-                        } else if (operand instanceof SqlIdentifier) {
-                            SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
+                    if (operandList.size() == 2) {
+                        transformOptional = Optional.of(operandList.get(0));
+                        SqlNode sqlNode1 = operandList.get(1);
+                        if (sqlNode1 instanceof SqlIdentifier) {
+                            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode1;
                             columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                         }
                     }
@@ -210,6 +210,10 @@ public class FlinkSqlParser {
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                if (DEFAULT_TABLE_NAME.equals(columnName)
+                        || DEFAULT_DATABASE_NAME.equals(columnName)) {
+                    continue;
+                }
                 columnTransformList.add(
                         ColumnTransform.of(
                                 columnName,
@@ -290,9 +294,16 @@ public class FlinkSqlParser {
         return parseColumnNameList(sqlBasicCall);
     }
 
-    private static List<String> parseColumnNameList(SqlBasicCall sqlBasicCall) {
+    private static List<String> parseColumnNameList(SqlNode sqlNode) {
         List<String> columnNameList = new ArrayList<>();
-        findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
+        if (sqlNode instanceof SqlIdentifier) {
+            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+            String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+            columnNameList.add(columnName);
+        } else if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
+        }
         return columnNameList;
     }
 

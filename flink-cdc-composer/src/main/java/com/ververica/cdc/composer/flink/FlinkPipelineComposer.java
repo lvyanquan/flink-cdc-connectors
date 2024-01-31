@@ -129,7 +129,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Transform Data
         stream =
-                transformTranslator.translateData(stream, pipelineDef.getTransforms(), parallelism);
+                transformTranslator.translateData(
+                        stream,
+                        pipelineDef.getTransforms(),
+                        parallelism,
+                        schemaOperatorIDGenerator.generate());
 
         // Route
         RouteTranslator routeTranslator = new RouteTranslator();

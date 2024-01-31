@@ -77,9 +77,9 @@ public class Projector {
     }
 
     public BinaryRecordData recordFillDataField(
-            BinaryRecordData data, TableInfo originalTableInfo, TableInfo tableInfo) {
+            BinaryRecordData data, TableChangeInfo tableChangeInfo) {
         List<Object> valueList = new ArrayList<>();
-        for (Column column : tableInfo.getSchema().getColumns()) {
+        for (Column column : tableChangeInfo.getTransformedSchema().getColumns()) {
             boolean isColumnTransform = false;
             for (ColumnTransform columnTransform : columnTransformList) {
                 if (column.getName().equals(columnTransform.getColumnName())
@@ -91,10 +91,10 @@ public class Projector {
             }
             if (!isColumnTransform) {
                 valueList.add(
-                        getValueFromBinaryRecordData(column.getName(), data, originalTableInfo));
+                        getValueFromBinaryRecordData(column.getName(), data, tableChangeInfo));
             }
         }
-        return tableInfo
+        return tableChangeInfo
                 .getRecordDataGenerator()
                 .generate(valueList.toArray(new Object[valueList.size()]));
     }
@@ -121,6 +121,19 @@ public class Projector {
         return tableInfo
                 .getRecordDataGenerator()
                 .generate(valueList.toArray(new Object[valueList.size()]));
+    }
+
+    private Object getValueFromBinaryRecordData(
+            String columnName, BinaryRecordData binaryRecordData, TableChangeInfo tableChangeInfo) {
+        List<Column> columns = tableChangeInfo.getOriginalSchema().getColumns();
+        for (int i = 0; i < columns.size(); i++) {
+            if (columnName.equals(columns.get(i).getName())) {
+                RecordData.FieldGetter[] fieldGetters = tableChangeInfo.getFieldGetters();
+                return DataTypeConverter.convert(
+                        fieldGetters[i].getFieldOrNull(binaryRecordData), columns.get(i).getType());
+            }
+        }
+        return null;
     }
 
     private Object getValueFromBinaryRecordData(

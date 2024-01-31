@@ -16,11 +16,9 @@
 
 package com.ververica.cdc.runtime.parser.validate;
 
-import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.planner.plan.type.FlinkReturnTypes;
-
 import com.ververica.cdc.runtime.functions.BuiltInSqlFunction;
 import com.ververica.cdc.runtime.functions.FlinkCDCTimestampFunction;
+import com.ververica.cdc.runtime.functions.FlinkReturnTypes;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -40,10 +38,7 @@ import org.apache.calcite.sql.validate.SqlNameMatchers;
 
 import javax.annotation.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
-
-import static org.apache.flink.table.planner.plan.type.FlinkReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE;
 
 /** FlinkCDCOperatorTable to generate the metadata of calcite. */
 public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
@@ -56,33 +51,9 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
         if (instance == null) {
             instance = new FlinkCDCOperatorTable();
             instance.init();
-            // ensure no dynamic function declares directly
-            validateNoDynamicFunction(instance);
-
-            // register functions based on batch or streaming mode
-            final FlinkCDCOperatorTable finalInstance = instance;
-            dynamicFunctions().forEach(f -> finalInstance.register(f));
         }
 
         return instance;
-    }
-
-    public static List<SqlFunction> dynamicFunctions() {
-        return Arrays.asList();
-    }
-
-    private static void validateNoDynamicFunction(FlinkCDCOperatorTable instance)
-            throws TableException {
-        instance.getOperatorList()
-                .forEach(
-                        op -> {
-                            if (op.isDynamicFunction() && op.isDeterministic()) {
-                                throw new TableException(
-                                        String.format(
-                                                "Dynamic function: %s is not allowed declaring directly, please add it to initializing.",
-                                                op.getName()));
-                            }
-                        });
     }
 
     @Override
@@ -164,7 +135,7 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "SUBSTR",
                     SqlKind.OTHER_FUNCTION,
-                    ARG0_VARCHAR_FORCE_NULLABLE,
+                    FlinkReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE,
                     null,
                     OperandTypes.or(
                             OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
@@ -182,7 +153,7 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
                     OperandTypes.or(OperandTypes.NUMERIC_INTEGER, OperandTypes.NUMERIC),
                     SqlFunctionCategory.NUMERIC);
     public static final SqlFunction UUID =
-            org.apache.flink.table.planner.functions.sql.BuiltInSqlFunction.newBuilder()
+            BuiltInSqlFunction.newBuilder()
                     .name("UUID")
                     .returnType(ReturnTypes.explicit(SqlTypeName.CHAR, 36))
                     .operandTypeChecker(OperandTypes.NILADIC)

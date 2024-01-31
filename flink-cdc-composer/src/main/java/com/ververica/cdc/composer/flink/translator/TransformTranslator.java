@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.composer.flink.translator;
 
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import com.ververica.cdc.common.event.Event;
@@ -48,22 +49,27 @@ public class TransformTranslator {
     }
 
     public DataStream<Event> translateData(
-            DataStream<Event> input, List<TransformDef> transforms, int parallelism) {
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            int parallelism,
+            OperatorID schemaOperatorID) {
         if (transforms.isEmpty()) {
             return input;
         }
 
-        TransformDataOperator.Builder transformFunctionBuilder = TransformDataOperator.newBuilder();
+        TransformDataOperator.Builder transformDataFunctionBuilder =
+                TransformDataOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {
-                transformFunctionBuilder.addTransform(
+                transformDataFunctionBuilder.addTransform(
                         transform.getSourceTable(),
                         transform.isValidProjection() ? transform.getProjection().get() : null,
                         transform.isValidFilter() ? transform.getFilter().get() : null);
             }
         }
+        transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
         return input.transform(
-                        "Transform:Data", new EventTypeInfo(), transformFunctionBuilder.build())
+                        "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build())
                 .setParallelism(parallelism)
                 .forward();
     }
