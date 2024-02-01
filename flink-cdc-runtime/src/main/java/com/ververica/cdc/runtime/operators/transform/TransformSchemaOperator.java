@@ -172,10 +172,14 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             while (iterator.hasNext()) {
                 TableChangeInfo stateTableChangeInfo =
                         TableChangeInfo.SERIALIZER.deserialize(
-                                TableChangeInfo.SERIALIZER.CURRENT_VERSION, iterator.next());
+                                TableChangeInfo.SERIALIZER.getVersion(), iterator.next());
                 if (stateTableChangeInfo.getTableId().equals(tableId)) {
                     originalSchema = stateTableChangeInfo.getOriginalSchema();
                     transformedSchema = stateTableChangeInfo.getTransformedSchema();
+                    LOG.info(
+                            "TableChangeInfo state: {}",
+                            stateTableChangeInfo.getTableId().identifier());
+                    break;
                 }
             }
             if (originalSchema == null || transformedSchema == null) {

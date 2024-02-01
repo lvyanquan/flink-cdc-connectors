@@ -195,7 +195,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent) {
+    private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent)
+            throws Exception {
         Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
         TableId tableId = dataChangeEvent.tableId();
 
@@ -229,18 +230,20 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     private Optional<DataChangeEvent> applyFilter(
-            RowFilter rowFilter, DataChangeEvent dataChangeEvent) {
+            RowFilter rowFilter, DataChangeEvent dataChangeEvent) throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         // insert and update event only apply afterData, delete only apply beforeData
         if (after != null) {
-            if (rowFilter.run(after, tableInfoMap.get(dataChangeEvent.tableId()))) {
+            if (rowFilter.run(
+                    after, getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()))) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
-            if (rowFilter.run(before, tableInfoMap.get(dataChangeEvent.tableId()))) {
+            if (rowFilter.run(
+                    before, getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()))) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
@@ -250,17 +253,21 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     private Optional<DataChangeEvent> applyProjection(
-            Projector projector, DataChangeEvent dataChangeEvent) {
+            Projector projector, DataChangeEvent dataChangeEvent) throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
             BinaryRecordData data =
-                    projector.recordData(before, tableInfoMap.get(dataChangeEvent.tableId()));
+                    projector.recordData(
+                            before,
+                            getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
         }
         if (after != null) {
             BinaryRecordData data =
-                    projector.recordData(after, tableInfoMap.get(dataChangeEvent.tableId()));
+                    projector.recordData(
+                            after,
+                            getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()));
             dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
         }
         return Optional.of(dataChangeEvent);
