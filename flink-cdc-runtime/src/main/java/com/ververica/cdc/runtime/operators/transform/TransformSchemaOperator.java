@@ -41,7 +41,6 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -109,6 +108,14 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         ListStateDescriptor<byte[]> descriptor =
                 new ListStateDescriptor<>("originalSchemaState", byte[].class);
         state = stateStore.getListState(descriptor);
+        if (context.isRestored()) {
+            for (byte[] serializedTableInfo : state.get()) {
+                TableChangeInfo stateTableChangeInfo =
+                        TableChangeInfo.SERIALIZER.deserialize(
+                                TableChangeInfo.SERIALIZER.getVersion(), serializedTableInfo);
+                tableChangeInfoMap.put(stateTableChangeInfo.getTableId(), stateTableChangeInfo);
+            }
+        }
     }
 
     @Override
@@ -143,7 +150,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private SchemaChangeEvent cacheCreateTable(CreateTableEvent event) throws Exception {
+    private SchemaChangeEvent cacheCreateTable(CreateTableEvent event) {
         TableId tableId = event.tableId();
         Schema originalSchema = event.getSchema();
         event = transformCreateTableEvent(event);
@@ -152,43 +159,15 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         return event;
     }
 
-    private SchemaChangeEvent cacheChangeSchema(SchemaChangeEvent event) throws Exception {
+    private SchemaChangeEvent cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
-        TableChangeInfo tableChangeInfo = getTableChangeInfoFromState(tableId);
+        TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getOriginalSchema(), event);
         Schema newSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getTransformedSchema(), event);
         tableChangeInfoMap.put(tableId, TableChangeInfo.of(tableId, originalSchema, newSchema));
         return event;
-    }
-
-    private TableChangeInfo getTableChangeInfoFromState(TableId tableId) throws Exception {
-        TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
-        if (tableChangeInfo == null) {
-            Schema originalSchema = null;
-            Schema transformedSchema = null;
-            Iterator<byte[]> iterator = state.get().iterator();
-            while (iterator.hasNext()) {
-                TableChangeInfo stateTableChangeInfo =
-                        TableChangeInfo.SERIALIZER.deserialize(
-                                TableChangeInfo.SERIALIZER.getVersion(), iterator.next());
-                if (stateTableChangeInfo.getTableId().equals(tableId)) {
-                    originalSchema = stateTableChangeInfo.getOriginalSchema();
-                    transformedSchema = stateTableChangeInfo.getTransformedSchema();
-                    LOG.info(
-                            "TableChangeInfo state: {}",
-                            stateTableChangeInfo.getTableId().identifier());
-                    break;
-                }
-            }
-            if (originalSchema == null || transformedSchema == null) {
-                throw new RuntimeException(
-                        "Could not find schema message from state for " + tableId);
-            }
-            tableChangeInfo = TableChangeInfo.of(tableId, originalSchema, transformedSchema);
-        }
-        return tableChangeInfo;
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
@@ -221,7 +200,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     private DataChangeEvent applyProjection(Projector projector, DataChangeEvent dataChangeEvent)
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
-        TableChangeInfo tableChangeInfo = getTableChangeInfoFromState(tableId);
+        TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
