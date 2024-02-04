@@ -107,7 +107,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         OperatorStateStore stateStore = context.getOperatorStateStore();
         ListStateDescriptor<byte[]> descriptor =
                 new ListStateDescriptor<>("originalSchemaState", byte[].class);
-        state = stateStore.getListState(descriptor);
+        state = stateStore.getUnionListState(descriptor);
         if (context.isRestored()) {
             for (byte[] serializedTableInfo : state.get()) {
                 TableChangeInfo stateTableChangeInfo =
