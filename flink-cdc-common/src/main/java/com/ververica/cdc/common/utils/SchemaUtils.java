@@ -76,11 +76,6 @@ public class SchemaUtils {
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-            if (columns.contains(columnWithPosition.getAddColumn())) {
-                throw new IllegalArgumentException(
-                        columnWithPosition.getAddColumn().getName()
-                                + " of AddColumnEvent is already existed");
-            }
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     {
@@ -130,14 +125,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {
-        event.getDroppedColumnNames()
-                .forEach(
-                        column -> {
-                            if (!oldSchema.getColumn(column).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        column + " of DropColumnEvent is not existed");
-                            }
-                        });
         List<Column> columns =
                 oldSchema.getColumns().stream()
                         .filter(
@@ -148,14 +135,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyRenameColumnEvent(RenameColumnEvent event, Schema oldSchema) {
-        event.getNameMapping()
-                .forEach(
-                        (name, newName) -> {
-                            if (!oldSchema.getColumn(name).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        name + " of RenameColumnEvent is not existed");
-                            }
-                        });
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
@@ -172,14 +151,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyAlterColumnTypeEvent(AlterColumnTypeEvent event, Schema oldSchema) {
-        event.getTypeMapping()
-                .forEach(
-                        (name, newType) -> {
-                            if (!oldSchema.getColumn(name).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        name + " of AlterColumnTypeEvent is not existed");
-                            }
-                        });
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
