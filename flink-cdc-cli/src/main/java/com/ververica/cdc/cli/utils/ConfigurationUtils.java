@@ -21,6 +21,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import com.ververica.cdc.common.configuration.Configuration;
+import org.apache.commons.cli.CommandLine;
 
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
@@ -46,5 +47,12 @@ public class ConfigurationUtils {
                             "Failed to load config file \"%s\" to key-value pairs", configPath),
                     e);
         }
+    }
+
+    public static boolean isDeploymentMode(CommandLine commandLine) {
+        String target = commandLine.getOptionValue("target");
+        return target != null
+                && !target.equalsIgnoreCase("local")
+                && !target.equalsIgnoreCase("remote");
     }
 }
