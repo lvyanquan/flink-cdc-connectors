@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class K8SApplicationComposeExecutor implements PipelineComposeExecutor {
 
@@ -47,8 +46,7 @@ public class K8SApplicationComposeExecutor implements PipelineComposeExecutor {
             CommandLine commandLine, Configuration flinkConfig, List<Path> additionalJars) {
         LOG.info("Submitting application in 'Flink K8S Application Mode'.");
         flinkConfig.set(DeploymentOptions.TARGET, KubernetesDeploymentTarget.APPLICATION.getName());
-        List<String> jars =
-                new ArrayList<>();
+        List<String> jars = new ArrayList<>();
         // must be added cdc dist jar by default docker container path
         jars.add("local:///opt/flink-cdc/lib/flink-cdc-dist-3.0-SNAPSHOT.jar");
         flinkConfig.set(PipelineOptions.JARS, jars);
@@ -78,7 +76,7 @@ public class K8SApplicationComposeExecutor implements PipelineComposeExecutor {
             if (client != null) {
                 client.shutDownCluster();
             }
-            throw new RuntimeException("deploy flink cdc job failed ",e);
+            throw new RuntimeException("deploy flink cdc job failed ", e);
         } finally {
             descriptor.close();
             if (client != null) {

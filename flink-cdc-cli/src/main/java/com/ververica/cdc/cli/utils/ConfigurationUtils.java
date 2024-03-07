@@ -28,6 +28,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
+import static com.ververica.cdc.cli.CliFrontendOptions.TARGET;
+
 /** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
     public static Configuration loadMapFormattedConfig(Path configPath) throws Exception {
@@ -50,7 +52,7 @@ public class ConfigurationUtils {
     }
 
     public static boolean isDeploymentMode(CommandLine commandLine) {
-        String target = commandLine.getOptionValue("target");
+        String target = commandLine.getOptionValue(TARGET);
         return target != null
                 && !target.equalsIgnoreCase("local")
                 && !target.equalsIgnoreCase("remote");

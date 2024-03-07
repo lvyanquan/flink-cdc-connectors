@@ -65,16 +65,15 @@ public class CliFrontend {
 
     @VisibleForTesting
     static CliExecutor createExecutor(CommandLine commandLine) throws Exception {
-        // The pipeline definition file would remain unparsed
-        List<String> unparsedArgs = commandLine.getArgList();
-        if (unparsedArgs.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Missing pipeline definition file path in arguments. ");
-        }
-
         Path pipelineDefPath = null;
         // If Running cdc job,need to set pipeline path
         if (!ConfigurationUtils.isDeploymentMode(commandLine)) {
+            // The pipeline definition file would remain unparsed
+            List<String> unparsedArgs = commandLine.getArgList();
+            if (unparsedArgs.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Missing pipeline definition file path in arguments. ");
+            }
             // Take the first unparsed argument as the pipeline definition file
             pipelineDefPath = Paths.get(unparsedArgs.get(0));
             LOG.info("Real Path pipelineDefPath {}", pipelineDefPath);
