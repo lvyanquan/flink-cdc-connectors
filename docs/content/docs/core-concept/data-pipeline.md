@@ -23,3 +23,17 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+Since events flow from the upstream to the downstream in a pipeline manner, the data synchronization task is also referred as a Data Pipeline.
+
+To describe a Data Pipeline, the follows are required:   
+Name: The name of the pipeline, which will be submitted to the Flink cluster as the job name.   
+parallelism: The global parallelism of the pipeline.    
+local-time-zone: The local time zone defines current session time zone id.    
+
+
+For example, we can use this yaml file to define a pipeline:
+```yaml
+pipeline:
+    name: mysql-to-kafka-pipeline
+    parallelism: 1
+```

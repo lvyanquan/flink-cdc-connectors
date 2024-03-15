@@ -23,3 +23,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+The Data Sink is used to apply schema changes and write change data to external systems. A Data Sink can write to multiple tables simultaneously.
+
+To describe a data sink, the follows are required:   
+Type: The type of the sink, such as MySQL or PostgreSQL.     
+Name: The name of the sink, which is user-defined (optional, with a default value provided).     
+Other custom configurations for the sink.    
+
+For example, we can use this yaml file to define a doris sink:
+```yaml
+sink:
+    type: doris
+    name: doris-sink           	# Optional parameter for description purpose
+    fenodes: 127.0.0.1:8030
+    username: root
+    password: ""
+    table.create.properties.replication_num: 1      	# Optional parameter for advanced functionalities
+```

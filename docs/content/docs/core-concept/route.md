@@ -23,3 +23,26 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+Route specifies the target table ID of each event. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
+
+To describe a route, the follows are required:   
+source-table: Source table id, supports regular expressions     
+sink-table: Sink table id, supports regular expressions    
+description: Routing rule description(optional, default value provided)    
+
+For example, if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+
+```yaml
+route:
+    source-table: mydb.web_order
+    sink-table: mydb.ods_web_order
+    description: sync table to one destination table with given prefix ods_
+```
+
+What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+```yaml
+route:
+    source-table: mydb\.*
+    sink-table: mydb.ods_web_order
+    description: sync sharding tables to one destination table
+```

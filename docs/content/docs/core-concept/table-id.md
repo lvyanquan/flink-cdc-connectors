@@ -23,3 +23,13 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+When connecting to external systems, it is necessary to establish a mapping relationship with the storage objects of the external system. This is what Table Id refers to.
+
+To be compatible with most external systems, the Table Id is represented by a 3-tuple : (namespace, schemaName, tableName). Connectors need to establish the mapping between Table ID and storage objects in external systems.
+The following table lists the parts in tableId of different data systems.
+
+| data system           | parts in tableId         |  
+|-----------------------|--------------------------|   
+| Oracle/PostgreSQL     | database, schema, table  |
+| MySQL/Doris/StarRocks | database, table          |
+| Kafka                 | topic                    |
